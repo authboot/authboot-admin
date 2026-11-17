@@ -50,6 +50,20 @@ export async function refreshSession(): Promise<boolean> {
   return res.ok && data.code === 0;
 }
 
+/** Ask authboot-server to send a password reset link/code to the email. */
+export async function requestPasswordReset(email: string): Promise<AuthResult> {
+  const res = await fetch('/api/auth/forgot-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  });
+  const data = await res.json().catch(() => ({ message: 'Unexpected response' }));
+  if (!res.ok || data.code !== 0) {
+    return { success: false, message: data.message ?? 'Failed to send the reset email' };
+  }
+  return { success: true, message: data.message ?? 'Reset email sent' };
+}
+
 export async function fetchCurrentUser() {
   const res = await fetch('/api/auth/me');
   if (!res.ok) return null;

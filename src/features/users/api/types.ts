@@ -3,7 +3,6 @@ export type { User } from '@/constants/mock-api-users';
 export type UserFilters = {
   page?: number;
   limit?: number;
-  roles?: string;
   search?: string;
   sort?: string;
 };
@@ -49,6 +48,25 @@ export type UserMutationPayload = {
   last_name: string;
   email: string;
   phone: string;
-  role: string;
   status: string;
+};
+
+/** Internal admin note attached to a user account. */
+export type UserNote = {
+  id: number;
+  user_id: number;
+  author: string;
+  body: string;
+  created_at: string;
+};
+
+export type UserNotesResponse = {
+  success: boolean;
+  message: string;
+  notes: UserNote[];
+};
+
+export type UserNotePayload = {
+  body: string;
+  author?: string;
 };

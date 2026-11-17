@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { FieldGroup } from '@/components/ui/field';
 import { Icons } from '@/components/icons';
+import { useAuth } from '@/components/auth/auth-provider';
 import { useAppForm } from '@/lib/form';
 import { organizationKeys, organizationQueryOptions } from '../api/queries';
 import { updateOrganizationMutation } from '../api/mutations';
@@ -34,6 +35,9 @@ export function GeneralSettingsCard({ orgId }: GeneralSettingsCardProps) {
   const { data } = useSuspenseQuery(organizationQueryOptions(orgId));
   const organization = data?.organization;
   const queryClient = useQueryClient();
+  // The sidebar org switcher reads its list from AuthProvider — refresh it so
+  // name/logo changes show up there without a page reload.
+  const { refresh } = useAuth();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [logoUrl, setLogoUrl] = useState(organization?.logo ?? '');
@@ -43,6 +47,7 @@ export function GeneralSettingsCard({ orgId }: GeneralSettingsCardProps) {
     mutationFn: updateOrganizationMutation.mutationFn,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.all });
+      void refresh();
       toast.success('Workspace settings saved');
     },
     onError: () => toast.error("Couldn't save workspace settings. Try again.")
@@ -52,6 +57,8 @@ export function GeneralSettingsCard({ orgId }: GeneralSettingsCardProps) {
     mutationFn: (file: File) => uploadOrganizationLogo(orgId, file),
     onSuccess: (result) => {
       setLogoUrl(result.logo);
+      queryClient.invalidateQueries({ queryKey: organizationKeys.all });
+      void refresh();
       toast.success('Logo uploaded');
     },
     onError: () => toast.error("Couldn't upload the logo. Try again.")

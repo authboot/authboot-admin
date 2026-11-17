@@ -4,11 +4,15 @@
 // GET    → GET    {BACKEND_URL}/api/v1/admin/organizations/{orgId}/users/{id}
 // PUT    → PUT    .../users/{id}  (nickname derived from the form's name fields)
 // DELETE → 501 — the backend exposes disable/enable, not hard delete.
+//
+// In development, users created from the dashboard live in an in-memory store
+// (src/lib/dev-users-store.ts); all three handlers resolve those first.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { authbootBaseUrl, getAccessToken } from '@/lib/auth';
 import { ACTIVE_ORG_COOKIE, parseOrgId } from '@/lib/auth-shared';
+import { devUsersEnabled, findDevUser, removeDevUser, updateDevUser } from '@/lib/dev-users-store';
 import { normalizeUser } from '@/lib/user-mapper';
 
 type Params = { params: Promise<{ id: string }> };
@@ -22,6 +26,18 @@ async function authContext() {
 
 export async function GET(_request: NextRequest, { params }: Params) {
   const { id } = await params;
+
+  // Dev-only: users created from the dashboard are not in the backend.
+  const devUser = devUsersEnabled() ? findDevUser(Number(id)) : undefined;
+  if (devUser) {
+    return NextResponse.json({
+      success: true,
+      time: new Date().toISOString(),
+      message: 'Development user',
+      user: devUser
+    });
+  }
+
   const { token, orgId } = await authContext();
   if (!token || !orgId) {
     return NextResponse.json(
@@ -71,6 +87,27 @@ export async function PUT(request: NextRequest, { params }: Params) {
   }
 
   const formBody = await request.json().catch(() => ({}));
+
+  // Dev-only: keep dashboard-created rows editable.
+  if (devUsersEnabled()) {
+    const devUser = findDevUser(Number(id));
+    if (devUser) {
+      const updated = updateDevUser(Number(id), {
+        first_name: formBody.first_name ?? devUser.first_name,
+        last_name: formBody.last_name ?? devUser.last_name,
+        email: formBody.email ?? devUser.email,
+        phone: formBody.phone ?? devUser.phone,
+        status: formBody.status ?? devUser.status
+      });
+      return NextResponse.json({
+        success: true,
+        time: new Date().toISOString(),
+        message: 'User updated (development only)',
+        user: updated
+      });
+    }
+  }
+
   // The form submits first/last name + contact fields the backend list
   // model doesn't carry; map the name to the backend's nickname field.
   const nickname = `${formBody.first_name ?? ''} ${formBody.last_name ?? ''}`.trim();
@@ -111,7 +148,17 @@ export async function PUT(request: NextRequest, { params }: Params) {
   });
 }
 
-export async function DELETE() {
+export async function DELETE(_request: NextRequest, { params }: Params) {
+  const { id } = await params;
+
+  // Dev-only: remove dashboard-created rows from the local store.
+  if (devUsersEnabled() && removeDevUser(Number(id))) {
+    return NextResponse.json({
+      success: true,
+      message: 'User deleted (development only)'
+    });
+  }
+
   return NextResponse.json(
     { success: false, message: '后端未提供删除用户接口，可使用禁用/启用替代' },
     { status: 501 }

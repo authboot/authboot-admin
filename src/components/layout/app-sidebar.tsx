@@ -125,7 +125,7 @@ export default function AppSidebar() {
                   />
                 }
               >
-                {user && <UserAvatarProfile className='h-8 w-8 rounded-lg' showInfo user={user} />}
+                {user && <UserAvatarProfile className='h-8 w-8' showInfo user={user} />}
                 <Icons.chevronsDown className='ml-auto size-4' />
               </DropdownMenuTrigger>
               <DropdownMenuContent
@@ -137,15 +137,17 @@ export default function AppSidebar() {
                 <DropdownMenuGroup>
                   <DropdownMenuLabel className='p-0 font-normal'>
                     <div className='px-1 py-1.5'>
-                      {user && (
-                        <UserAvatarProfile className='h-8 w-8 rounded-lg' showInfo user={user} />
-                      )}
+                      {user && <UserAvatarProfile className='h-8 w-8' showInfo user={user} />}
                     </div>
                   </DropdownMenuLabel>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
 
                 <DropdownMenuGroup>
+                  <DropdownMenuItem onClick={() => router.push('/dashboard/settings')}>
+                    <Icons.settings className='mr-2 h-4 w-4' />
+                    {t('nav.items.settings')}
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push('/dashboard/profile')}>
                     <Icons.account className='mr-2 h-4 w-4' />
                     {t('nav.items.profile')}

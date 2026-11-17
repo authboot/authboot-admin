@@ -1,97 +1,257 @@
 'use client';
 
+import Link from 'next/link';
+import { z } from 'zod';
+import { toast } from 'sonner';
+import PageContainer from '@/components/layout/page-container';
 import { useAuth } from '@/components/auth/auth-provider';
 import { updateProfile } from '@/lib/auth-client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAppForm } from '@/lib/form';
+import { formatDate } from '@/lib/format';
+import type { AuthUser, Organization } from '@/lib/auth-types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { LoadingButton } from '@/components/ui/loading-button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { FieldGroup } from '@/components/ui/field';
+import { Separator } from '@/components/ui/separator';
 import { Icons } from '@/components/icons';
-import { useState } from 'react';
+
+const profileSchema = z.object({
+  nickname: z
+    .string()
+    .trim()
+    .min(1, { message: 'Display name is required' })
+    .max(32, { message: 'Keep the display name under 32 characters' })
+});
+
+function displayNameOf(user: AuthUser): string {
+  return user.nickname?.trim() || user.email || 'Unnamed';
+}
+
+function initialsOf(name: string): string {
+  return name.slice(0, 2).toUpperCase() || 'AD';
+}
 
 export default function ProfileViewPage() {
-  const { user, refresh } = useAuth();
-  const [nickname, setNickname] = useState(user?.nickname ?? '');
-  const [isPending, setIsPending] = useState(false);
-  const [message, setMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+  const { isLoaded } = useAuth();
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (isPending || !user) return;
-    setIsPending(true);
-    setMessage(null);
-    try {
-      const result = await updateProfile({ nickname: nickname.trim() });
+  return (
+    <PageContainer
+      isLoading={!isLoaded}
+      pageTitle='Profile'
+      pageDescription='Manage your personal information and how it appears across the dashboard.'
+    >
+      <ProfileSettings />
+    </PageContainer>
+  );
+}
+
+/**
+ * Profile content without the page chrome — reused by the Settings page so the
+ * same identity/form UI is not duplicated.
+ */
+export function ProfileSettings() {
+  const { user, organizations, activeOrganizationId } = useAuth();
+  const activeOrganization =
+    organizations.find((org) => org.id === activeOrganizationId) ?? organizations[0];
+
+  if (!user) {
+    return (
+      <Card className='max-w-3xl'>
+        <CardHeader>
+          <CardTitle className='flex items-center gap-2'>
+            <Icons.account className='size-5' />
+            Not signed in
+          </CardTitle>
+          <CardDescription>Sign in to view and edit your profile.</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  return <ProfileContent user={user} organization={activeOrganization} />;
+}
+
+function ProfileContent({ user, organization }: { user: AuthUser; organization?: Organization }) {
+  const { refresh } = useAuth();
+  const name = displayNameOf(user);
+
+  const form = useAppForm({
+    defaultValues: { nickname: user.nickname ?? '' },
+    validators: { onSubmit: profileSchema },
+    onSubmit: async ({ value }) => {
+      const result = await updateProfile({ nickname: value.nickname.trim() });
       if (!result.success) {
-        setMessage({ kind: 'error', text: result.message });
+        toast.error(result.message);
         return;
       }
       await refresh();
-      setMessage({ kind: 'success', text: 'Profile updated' });
-    } finally {
-      setIsPending(false);
+      toast.success('Profile updated');
     }
-  };
-
-  if (!user) {
-    return null;
-  }
+  });
 
   return (
-    <div className='flex w-full flex-col gap-6 p-4'>
-      <Card>
-        <CardHeader>
-          <CardTitle>Profile</CardTitle>
-          <CardDescription>Your platform account information</CardDescription>
-        </CardHeader>
-        <CardContent className='flex items-center gap-4'>
-          <Avatar className='h-16 w-16 rounded-lg'>
-            <AvatarImage src={user.avatar || ''} alt={user.nickname || user.email} />
-            <AvatarFallback className='rounded-lg text-lg'>
-              {(user.nickname || user.email).slice(0, 2).toUpperCase()}
-            </AvatarFallback>
+    <div className='grid gap-6 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]'>
+      {/* Identity summary */}
+      <Card className='h-fit gap-0 overflow-hidden py-0 lg:sticky lg:top-4'>
+        <div className='from-primary/15 via-primary/5 h-24 bg-gradient-to-br to-transparent' />
+        <CardContent className='-mt-10 space-y-4 px-4 pb-4'>
+          <Avatar className='ring-background size-20 shadow-sm ring-4'>
+            <AvatarImage src={user.avatar || ''} alt={name} />
+            <AvatarFallback className='text-xl font-semibold'>{initialsOf(name)}</AvatarFallback>
           </Avatar>
-          <div className='grid gap-0.5 text-sm'>
-            <span className='font-semibold'>{user.nickname || 'Unnamed'}</span>
-            <span className='text-muted-foreground'>{user.email}</span>
+
+          <div className='min-w-0 space-y-1'>
+            <h2 className='truncate text-lg font-semibold'>{name}</h2>
+            <p className='text-muted-foreground truncate text-sm'>{user.email}</p>
           </div>
+
+          <div className='flex flex-wrap gap-2'>
+            <Badge variant='secondary' className='gap-1'>
+              <Icons.shieldCheck className='size-3' />
+              Administrator
+            </Badge>
+            {organization && (
+              <Badge variant='outline' className='gap-1'>
+                <Icons.workspace className='size-3' />
+                {organization.name}
+              </Badge>
+            )}
+          </div>
+
+          <Separator />
+
+          <dl className='space-y-3 text-sm'>
+            <div className='flex items-start gap-3'>
+              <Icons.mail className='text-muted-foreground mt-0.5 size-4 shrink-0' />
+              <div className='min-w-0'>
+                <dt className='text-muted-foreground text-xs'>Email</dt>
+                <dd className='truncate font-medium'>{user.email}</dd>
+              </div>
+            </div>
+            {user.createdAt ? (
+              <div className='flex items-start gap-3'>
+                <Icons.calendar className='text-muted-foreground mt-0.5 size-4 shrink-0' />
+                <div>
+                  <dt className='text-muted-foreground text-xs'>Member since</dt>
+                  <dd className='font-medium'>{formatDate(user.createdAt * 1000)}</dd>
+                </div>
+              </div>
+            ) : null}
+            <div className='flex items-start gap-3'>
+              <Icons.account className='text-muted-foreground mt-0.5 size-4 shrink-0' />
+              <div>
+                <dt className='text-muted-foreground text-xs'>Account ID</dt>
+                <dd className='font-mono text-xs font-medium'>#{user.id}</dd>
+              </div>
+            </div>
+          </dl>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Edit Profile</CardTitle>
-          <CardDescription>Update your display name</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className='grid max-w-sm gap-4'>
-            <div className='grid gap-2'>
-              <Label htmlFor='nickname'>Nickname</Label>
-              <Input
-                id='nickname'
-                value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
-                placeholder='Your display name'
-              />
-            </div>
+      <div className='space-y-6'>
+        {/* Editable profile */}
+        <Card>
+          <CardHeader>
+            <CardTitle className='flex items-center gap-2'>
+              <Icons.account className='size-5' />
+              Personal information
+            </CardTitle>
+            <CardDescription>
+              This name is shown in the sidebar, chat and audit logs.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form
+              className='space-y-5'
+              onSubmit={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                void form.handleSubmit();
+              }}
+            >
+              <FieldGroup className='max-w-md'>
+                <form.AppField
+                  name='nickname'
+                  children={(field) => (
+                    <field.TextField
+                      label='Display name'
+                      description='Up to 32 characters.'
+                      placeholder='Your display name'
+                      required
+                    />
+                  )}
+                />
+              </FieldGroup>
 
-            {message && (
-              <Alert variant={message.kind === 'error' ? 'destructive' : 'default'}>
-                <Icons.info className='h-4 w-4' />
-                <AlertDescription>{message.text}</AlertDescription>
-              </Alert>
+              <div className='flex items-center gap-2'>
+                {/* SubmitButton needs formContext, provided by form.AppForm. */}
+                <form.AppForm>
+                  <form.SubmitButton>Save changes</form.SubmitButton>
+                </form.AppForm>
+                <Button
+                  type='button'
+                  variant='ghost'
+                  disabled={form.state.isSubmitting}
+                  onClick={() => form.reset()}
+                >
+                  Reset
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Active workspace */}
+        <Card>
+          <CardHeader>
+            <CardTitle className='flex items-center gap-2'>
+              <Icons.workspace className='size-5' />
+              Workspace
+            </CardTitle>
+            <CardDescription>The workspace your account is active in right now.</CardDescription>
+          </CardHeader>
+          <CardContent className='space-y-4'>
+            {organization ? (
+              <div className='flex items-center gap-3'>
+                <div className='bg-muted flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg'>
+                  {organization.logo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={organization.logo}
+                      alt={organization.name}
+                      className='size-full object-cover'
+                    />
+                  ) : (
+                    <Icons.workspace className='text-muted-foreground size-5' />
+                  )}
+                </div>
+                <div className='min-w-0 flex-1'>
+                  <p className='truncate text-sm font-medium'>{organization.name}</p>
+                  <p className='text-muted-foreground truncate text-xs'>
+                    {organization.code || 'Organization'}
+                  </p>
+                </div>
+                <Badge variant='outline'>Active</Badge>
+              </div>
+            ) : (
+              <p className='text-muted-foreground text-sm'>No workspace selected.</p>
             )}
 
-            <div>
-              <LoadingButton type='submit' loading={isPending}>
-                Save
-              </LoadingButton>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+            <Button
+              variant='outline'
+              size='sm'
+              // Renders an <a> (next/link), so drop native button semantics.
+              nativeButton={false}
+              render={<Link href='/dashboard/workspaces/settings' aria-label='Manage workspace' />}
+            >
+              Manage workspace
+              <Icons.chevronRight className='size-3.5' />
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

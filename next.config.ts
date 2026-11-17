@@ -3,6 +3,9 @@ import { withSentryConfig } from '@sentry/nextjs';
 
 // Define the base Next.js configuration
 const baseConfig: NextConfig = {
+  // Allow accessing Next.js dev resources from the server IP
+  allowedDevOrigins: ['10.99.64.82'],
+
   output: process.env.BUILD_STANDALONE === 'true' ? 'standalone' : undefined,
   images: {
     remotePatterns: [
@@ -26,13 +29,14 @@ if (!process.env.NEXT_PUBLIC_SENTRY_DISABLED) {
   configWithPlugins = withSentryConfig(configWithPlugins, {
     org: process.env.NEXT_PUBLIC_SENTRY_ORG,
     project: process.env.NEXT_PUBLIC_SENTRY_PROJECT,
+
     // Only print logs for uploading source maps in CI
     silent: !process.env.CI,
 
-    // Upload a larger set of source maps for prettier stack traces (increases build time)
+    // Upload a larger set of source maps for prettier stack traces
     widenClientFileUpload: true,
 
-    // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
+    // Route browser requests to Sentry through a Next.js rewrite
     tunnelRoute: '/monitoring',
 
     // Disable Sentry telemetry
@@ -50,7 +54,9 @@ if (!process.env.NEXT_PUBLIC_SENTRY_DISABLED) {
 
     // Disable source map upload when org/project are not configured
     sourcemaps: {
-      disable: !process.env.NEXT_PUBLIC_SENTRY_ORG || !process.env.NEXT_PUBLIC_SENTRY_PROJECT
+      disable:
+        !process.env.NEXT_PUBLIC_SENTRY_ORG ||
+        !process.env.NEXT_PUBLIC_SENTRY_PROJECT
     }
   });
 }

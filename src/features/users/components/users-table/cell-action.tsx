@@ -10,11 +10,12 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { deleteUserMutation } from '../../api/mutations';
+import { userKeys } from '../../api/queries';
 import type { User } from '../../api/types';
 import { Icons } from '@/components/icons';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { UserFormSheet } from '../user-form-sheet';
 
@@ -26,10 +27,13 @@ export function CellAction({ data }: CellActionProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const router = useRouter();
+  const queryClient = useQueryClient();
 
+  // The local `onSuccess` overrides the mutation option's invalidation.
   const deleteMutation = useMutation({
     ...deleteUserMutation,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.all });
       toast.success('User deleted successfully');
       setDeleteOpen(false);
     },

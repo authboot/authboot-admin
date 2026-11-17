@@ -23,7 +23,7 @@ export const usersInfoContent: InfobarContent = {
     {
       title: 'URL State with nuqs',
       description:
-        'Pagination, search, and role filters are synced to the URL via nuqs. The useDataTable hook manages the TanStack Table state and debounces filter changes before updating the URL. When the URL changes, React Query automatically refetches because the query key includes the filters.',
+        'Pagination, search, and sorting are synced to the URL via nuqs. The useDataTable hook manages the TanStack Table state and debounces filter changes before updating the URL. When the URL changes, React Query automatically refetches because the query key includes the filters.',
       links: [
         {
           title: 'nuqs Documentation',

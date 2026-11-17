@@ -16,7 +16,6 @@ export function UsersTable() {
     page: parseAsInteger.withDefault(1),
     perPage: parseAsInteger.withDefault(10),
     name: parseAsString,
-    role: parseAsString,
     sort: getSortingStateParser(columnIds).withDefault([])
   });
 
@@ -24,7 +23,6 @@ export function UsersTable() {
     page: params.page,
     limit: params.perPage,
     ...(params.name && { search: params.name }),
-    ...(params.role && { roles: params.role }),
     ...(params.sort.length > 0 && { sort: JSON.stringify(params.sort) })
   };
 

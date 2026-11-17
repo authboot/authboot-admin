@@ -42,19 +42,19 @@ export const teamInfoContent: InfobarContent = {
     {
       title: 'Overview',
       description:
-        'The Team Management page allows you to manage your workspace team, including members, roles, security settings, and more. Team management will be backed by the AuthBoot membership and invitation APIs.',
+        'The Team page lists everyone with access to the active workspace. This build uses a static mock roster until the AuthBoot membership and invitation APIs are wired up.',
       links: []
     },
     {
       title: 'Managing Team Members',
       description:
-        'You can add, remove, and manage team members from this page. Invite new members by email, assign roles, and control their access levels. Each member can have different permissions based on their role.',
+        'Search and filter the roster, resend pending invitations, copy contact details, or remove an admin. Invite and remove actions are UI demos and are not persisted yet.',
       links: []
     },
     {
-      title: 'Roles and Permissions',
+      title: 'Admins Only',
       description:
-        'Roles and permissions are defined and enforced by the AuthBoot RBAC backend. Roles define what actions team members can perform within the workspace. Common roles include admin, member, and custom roles.',
+        'Every workspace member currently has the Admin role. Granular roles and per-permission access will arrive together with the RBAC backend.',
       links: []
     },
     {

@@ -2,9 +2,9 @@
 // authboot-server User → dashboard User mapping (server-only)
 // ============================================================
 // The backend org-user model exposes {id, organization_id, nickname,
-// avatar, status, created_at, updated_at} — no email/phone/role in the
-// list view. These helpers normalize it into the frontend table's User
-// shape so the React Query layer and table components stay unchanged.
+// avatar, status, created_at, updated_at}. Some deployments also return
+// email/phone (or first/last name) — those are passed through when
+// present so the users table can render richer rows.
 
 import type { User, UserAddress } from '@/features/users/api/types';
 
@@ -25,24 +25,44 @@ export interface BackendUser {
   organization_id?: number;
   nickname?: string;
   avatar?: string;
+  // Optional richer fields — only present on some backend builds.
+  email?: string;
+  phone?: string;
+  first_name?: string;
+  last_name?: string;
+  // Profile fields returned by newer authboot-server builds.
+  gender?: number;
+  birthday?: string;
+  bio?: string;
+  background_image?: string;
+  signature?: string;
   status?: number;
   created_at?: number;
   updated_at?: number;
 }
 
 export function normalizeUser(raw: BackendUser): User {
+  // Backends that only expose `nickname` still get a usable name split.
+  const nickname = raw.nickname?.trim() ?? '';
+  const [nicknameFirst, ...nicknameRest] = nickname.split(/\s+/).filter(Boolean);
+
   return {
     id: raw.id ?? 0,
-    first_name: raw.nickname ?? '',
-    last_name: '',
-    email: '',
-    phone: '',
+    first_name: raw.first_name ?? nicknameFirst ?? '',
+    last_name: raw.last_name ?? nicknameRest.join(' '),
+    email: raw.email ?? '',
+    phone: raw.phone ?? '',
     status: backendStatusToLabel(raw.status),
-    role: '',
     created_at: toIsoString(raw.created_at),
     updated_at: toIsoString(raw.updated_at),
     avatar: raw.avatar ?? '',
-    organization_id: raw.organization_id
+    organization_id: raw.organization_id,
+    // Profile extras — optional on the dashboard User type.
+    gender: raw.gender,
+    birthday: raw.birthday ?? '',
+    bio: raw.bio ?? '',
+    background_image: raw.background_image ?? '',
+    signature: raw.signature ?? ''
   };
 }
 

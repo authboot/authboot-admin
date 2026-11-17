@@ -1,33 +1,29 @@
+import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
 import PageContainer from '@/components/layout/page-container';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Icons } from '@/components/icons';
+import { getQueryClient } from '@/lib/query-client';
 import { teamInfoContent } from '@/config/infoconfig';
+import { teamMembersOptions } from '@/features/team/api/queries';
+import { InviteAdminButton } from '@/features/team/components/invite-admin-sheet';
+import { TeamView } from '@/features/team/components/team-view';
+
+export const metadata = {
+  title: 'Dashboard: Team'
+};
 
 export default function TeamPage() {
+  const queryClient = getQueryClient();
+  void queryClient.prefetchQuery(teamMembersOptions());
+
   return (
     <PageContainer
-      pageTitle='Team Management'
-      pageDescription='Manage your workspace team, members, roles, security and more.'
+      pageTitle='Team'
+      pageDescription='Admins with access to this workspace. Static preview until membership APIs land.'
       infoContent={teamInfoContent}
+      pageHeaderAction={<InviteAdminButton />}
     >
-      <Card>
-        <CardHeader>
-          <CardTitle className='flex items-center gap-2'>
-            <Icons.teams className='h-5 w-5' />
-            Team Management
-          </CardTitle>
-          <CardDescription>
-            Member, role, and invitation management is provided by the AuthBoot backend (membership
-            &amp; invitation APIs). The management UI will be wired up to those endpoints next.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className='text-muted-foreground text-sm'>
-            This page currently shows a placeholder — team member management is not implemented yet
-            on the dashboard side.
-          </div>
-        </CardContent>
-      </Card>
+      <HydrationBoundary state={dehydrate(queryClient)}>
+        <TeamView />
+      </HydrationBoundary>
     </PageContainer>
   );
 }

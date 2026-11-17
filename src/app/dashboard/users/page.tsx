@@ -1,5 +1,6 @@
 import PageContainer from '@/components/layout/page-container';
 import UserListingPage from '@/features/users/components/user-listing';
+import { UserFormSheetTrigger } from '@/features/users/components/user-form-sheet';
 import { searchParamsCache } from '@/lib/searchparams';
 import type { SearchParams } from 'nuqs/server';
 import { usersInfoContent } from '@/features/users/info-content';
@@ -21,6 +22,7 @@ export default async function UsersPage(props: PageProps) {
       pageTitle='Users'
       pageDescription='Manage users (React Query + nuqs table pattern.)'
       infoContent={usersInfoContent}
+      pageHeaderAction={<UserFormSheetTrigger />}
     >
       <UserListingPage />
     </PageContainer>

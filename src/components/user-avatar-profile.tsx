@@ -13,9 +13,7 @@ export function UserAvatarProfile({ className, showInfo = false, user }: UserAva
     <div className='flex items-center gap-2'>
       <Avatar className={className}>
         <AvatarImage src={user?.avatar || ''} alt={displayName} />
-        <AvatarFallback className='rounded-lg'>
-          {displayName.slice(0, 2).toUpperCase() || 'CN'}
-        </AvatarFallback>
+        <AvatarFallback>{displayName.slice(0, 2).toUpperCase() || 'CN'}</AvatarFallback>
       </Avatar>
 
       {showInfo && (

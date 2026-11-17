@@ -14,16 +14,20 @@ export type User = {
   email: string;
   phone: string;
   status: string;
-  role: string;
   created_at: string;
   updated_at: string;
   // Optional backend-only fields (authboot-server org users).
   avatar?: string;
   organization_id?: number;
+  // Profile extras returned by newer authboot-server builds.
+  gender?: number;
+  birthday?: string;
+  bio?: string;
+  background_image?: string;
+  signature?: string;
 };
 
 function generateRandomUserData(id: number): User {
-  const roles = ['Developer', 'Designer', 'Manager', 'QA', 'DevOps', 'Product Owner'];
   const statuses = ['Active', 'Inactive', 'Invited'];
 
   return {
@@ -33,7 +37,6 @@ function generateRandomUserData(id: number): User {
     email: faker.internet.email(),
     phone: faker.phone.number({ style: 'national' }),
     status: faker.helpers.arrayElement(statuses),
-    role: faker.helpers.arrayElement(roles),
     created_at: faker.date.between({ from: '2022-01-01', to: '2023-12-31' }).toISOString(),
     updated_at: faker.date.recent().toISOString()
   };
@@ -52,12 +55,8 @@ export const fakeUsers = {
     this.records = sampleUsers;
   },
 
-  async getAll({ roles = [], search }: { roles?: string[]; search?: string }) {
+  async getAll({ search }: { search?: string }) {
     let users = [...this.records];
-
-    if (roles.length > 0) {
-      users = users.filter((user) => roles.includes(user.role));
-    }
 
     if (search) {
       users = matchSorter(users, search, {
@@ -129,22 +128,16 @@ export const fakeUsers = {
   async getUsers({
     page = 1,
     limit = 10,
-    roles,
     search,
     sort
   }: {
     page?: number;
     limit?: number;
-    roles?: string | string[];
     search?: string;
     sort?: string;
   }) {
     await delay(800);
-    const rolesArray = roles ? (Array.isArray(roles) ? roles : String(roles).split(/[.,]/)) : [];
-    const allUsers = await this.getAll({
-      roles: rolesArray,
-      search
-    });
+    const allUsers = await this.getAll({ search });
 
     // Sorting
     if (sort) {

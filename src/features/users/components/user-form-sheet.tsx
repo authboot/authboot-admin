@@ -14,12 +14,12 @@ import {
   SheetTitle
 } from '@/components/ui/sheet';
 import { Icons } from '@/components/icons';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createUserMutation, updateUserMutation } from '../api/mutations';
+import { userKeys } from '../api/queries';
 import type { User } from '../api/types';
 import { toast } from 'sonner';
 import { userSchema, type UserFormValues } from '../schemas/user';
-import { ROLE_OPTIONS } from './users-table/options';
 
 const STATUS_OPTIONS = [
   { value: 'Active', label: 'Active' },
@@ -35,10 +35,14 @@ interface UserFormSheetProps {
 
 export function UserFormSheet({ user, open, onOpenChange }: UserFormSheetProps) {
   const isEdit = !!user;
+  const queryClient = useQueryClient();
 
+  // The local `onSuccess` overrides the mutation option's cache invalidation,
+  // so refresh the lists/detail queries explicitly.
   const createMutation = useMutation({
     ...createUserMutation,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.all });
       toast.success('User created');
       onOpenChange(false);
       form.reset();
@@ -49,6 +53,7 @@ export function UserFormSheet({ user, open, onOpenChange }: UserFormSheetProps) 
   const updateMutation = useMutation({
     ...updateUserMutation,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.all });
       toast.success('User updated');
       onOpenChange(false);
     },
@@ -61,7 +66,6 @@ export function UserFormSheet({ user, open, onOpenChange }: UserFormSheetProps) 
       last_name: user?.last_name ?? '',
       email: user?.email ?? '',
       phone: user?.phone ?? '',
-      role: user?.role ?? '',
       status: user?.status ?? 'Active'
     } as UserFormValues,
     validators: {
@@ -131,18 +135,6 @@ export function UserFormSheet({ user, open, onOpenChange }: UserFormSheetProps) 
                 name='phone'
                 children={(field) => (
                   <field.TextField label='Phone' required type='tel' placeholder='(555) 123-4567' />
-                )}
-              />
-
-              <form.AppField
-                name='role'
-                children={(field) => (
-                  <field.SelectField
-                    label='Role'
-                    required
-                    options={ROLE_OPTIONS}
-                    placeholder='Select role'
-                  />
                 )}
               />
 

@@ -25,7 +25,7 @@ export default async function WorkspaceSettingsPage() {
       {orgId ? (
         <div className='max-w-3xl space-y-4'>
           <GeneralSettingsCard orgId={orgId} />
-          <LoginMethodsSettings orgId={orgId} />
+          <LoginMethodsSettings />
           <DangerZoneCard orgId={orgId} />
         </div>
       ) : (

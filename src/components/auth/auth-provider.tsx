@@ -91,13 +91,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.replace('/auth/sign-in');
   }, [router]);
 
-  const switchOrg = React.useCallback(async (organizationId: number) => {
-    const result = await switchOrganization(organizationId);
-    if (result.success) {
-      setActiveOrganizationId(organizationId);
-    }
-    return result;
-  }, []);
+  const switchOrg = React.useCallback(
+    async (organizationId: number) => {
+      const result = await switchOrganization(organizationId);
+      if (result.success) {
+        setActiveOrganizationId(organizationId);
+        // Server components read the active org from the cookie (overview,
+        // workspace settings, ...). Re-fetch the current route so their content
+        // switches to the new org without a full page reload.
+        router.refresh();
+      }
+      return result;
+    },
+    [router]
+  );
 
   const refresh = React.useCallback(async () => {
     await loadSession();

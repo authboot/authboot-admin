@@ -74,6 +74,15 @@ export const navGroups: NavGroup[] = [
         access: { requireOrg: true }
       },
       {
+        title: 'Legal',
+        titleKey: 'legal',
+        url: '/dashboard/workspaces/legal',
+        icon: 'page',
+        isActive: false,
+        items: [],
+        access: { requireOrg: true }
+      },
+      {
         title: 'Product',
         titleKey: 'product',
         url: '/dashboard/product',
@@ -92,11 +101,11 @@ export const navGroups: NavGroup[] = [
         items: []
       },
       {
-        title: 'Organizations',
-        titleKey: 'organizations',
-        url: '/dashboard/organizations',
-        icon: 'workspace',
-        shortcut: ['o', 'o'],
+        title: 'Security',
+        titleKey: 'security',
+        url: '/dashboard/security',
+        icon: 'shieldCheck',
+        shortcut: ['s', 's'],
         isActive: false,
         items: []
       },
