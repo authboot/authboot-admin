@@ -12,7 +12,7 @@ export default function CtaGithub() {
       render={
         <a
           aria-label='View on GitHub'
-          href='https://github.com/Kiranism/authboot-admin'
+          href='https://github.com/authboot'
           rel='noopener noreferrer'
           target='_blank'
           className='text-muted-foreground hover:text-foreground transition-colors duration-300'

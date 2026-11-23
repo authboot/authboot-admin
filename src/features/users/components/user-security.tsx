@@ -3,23 +3,22 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
 import { accountSecurityQueryOptions } from '@/features/security/api/queries';
-import {
-  AuditLogTableContent,
-  LoginLogTableContent,
-  SessionTableContent
-} from '@/features/security/components/security-tables';
+import { AuditLogTableContent } from '@/features/security/components/security-tables';
+import UserLoginHistory from './user-login-history';
+import UserSessionList from './user-session-list';
 
 /**
- * Admin view of one user's security posture: sessions, login history and the
- * security log. Static preview until authboot-server exposes per-user data.
+ * Admin view of one user's security posture. Sessions and login history are
+ * live data from authboot-server; the security log is still a static preview
+ * until the backend exposes per-user audit records.
  */
 export function UserSecurity({ userId }: { userId: string }) {
   const { data } = useSuspenseQuery(accountSecurityQueryOptions(userId));
 
   return (
     <div className='space-y-6'>
-      <SessionTableContent scope='user' rows={data.sessions} />
-      <LoginLogTableContent scope='user' rows={data.loginLogs} />
+      <UserSessionList userId={userId} />
+      <UserLoginHistory userId={userId} />
       <AuditLogTableContent scope='user' rows={data.auditLogs} />
     </div>
   );

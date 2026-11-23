@@ -12,6 +12,9 @@ import type {
   UsersResponse,
   UserByIdResponse,
   UserAddressesResponse,
+  UserSessionsResponse,
+  UserLoginLogFilters,
+  UserLoginLogsResponse,
   UserMutationPayload,
   UserNote,
   UserNotesResponse,
@@ -119,6 +122,22 @@ export async function updateUserAddress(
     message: 'Address updated (development only)',
     addresses: mockUserAddresses.map((item) => ({ ...item }))
   };
+}
+
+export async function getUserSessions(id: number): Promise<UserSessionsResponse> {
+  return apiClient<UserSessionsResponse>(`/users/${id}/sessions`);
+}
+
+export async function getUserLoginLogs(
+  id: number,
+  filters: UserLoginLogFilters = {}
+): Promise<UserLoginLogsResponse> {
+  const query = new URLSearchParams();
+  if (filters.page) query.set('page', String(filters.page));
+  if (filters.limit) query.set('limit', String(filters.limit));
+
+  const qs = query.toString();
+  return apiClient<UserLoginLogsResponse>(`/users/${id}/login-logs${qs ? `?${qs}` : ''}`);
 }
 
 export async function createUser(data: UserMutationPayload): Promise<UserByIdResponse> {
