@@ -84,25 +84,43 @@ export const workspaceSettingsInfoContent: InfobarContent = {
     {
       title: 'Overview',
       description:
-        'The Workspace Settings page configures the active workspace — its general info (name, code, logo), the sign-in methods available to its members, and ownership actions.',
+        'Workspace Settings configures the active workspace. It is split into tabs — General, Sign-in, Verification, Delivery, Templates and Maintenance — and the open tab is kept in the URL so it can be linked to.',
       links: []
     },
     {
-      title: 'General Settings',
+      title: 'General',
       description:
-        'Edit the workspace name, code, and logo. The logo can be uploaded directly and is stored by the AuthBoot backend; name and code update the organization record.',
+        'Edit the workspace name, code, and logo. The Danger zone lets you leave the workspace or delete it permanently; role and membership checks are enforced server-side.',
       links: []
     },
     {
-      title: 'Login Methods',
+      title: 'Sign-in',
       description:
-        'Choose which sign-in methods members can use: built-in email/phone, or third-party OAuth providers (WeChat, Alipay, Google, GitHub, Apple). Provider credentials are stored per workspace through the OAuth config API.',
+        'Choose which sign-in methods users can use (account password, email, phone, or third-party OAuth providers) and set the password policy: a preset or a custom regular expression, with the hint users see when a password is rejected.',
       links: []
     },
     {
-      title: 'Danger Zone',
+      title: 'Verification',
       description:
-        'Leave the workspace (losing access until invited back) or delete it permanently. Deleting removes all members, roles, login configurations, and data. Role and membership checks are enforced server-side by the backend.',
+        'Set, separately for email and phone codes, how long a code stays valid, how long a recipient must wait before asking for another, and how many codes one recipient can be sent per hour.',
+      links: []
+    },
+    {
+      title: 'Delivery',
+      description:
+        'Send email and SMS from your own account. Choose Add provider to pick one from the catalog of supported providers and enter its settings; the connection is checked first, and the provider is only switched on if the check passes. One connected provider is in use per channel; with none connected, the platform default service is used.',
+      links: []
+    },
+    {
+      title: 'Templates',
+      description:
+        'Edit the subject and HTML body of the emails the workspace sends: verification codes, workspace invitations and sign-in security alerts. Each email has its own variables, written as {{.Name}}, that are replaced with real values when it is sent. The preview shows the email with sample values, and Restore default brings back the built-in wording.',
+      links: []
+    },
+    {
+      title: 'Maintenance',
+      description:
+        'Maintenance mode pauses sign-in and sign-up for the workspace and shows users a notice with an optional expected end time. Admins can still use the dashboard.',
       links: []
     },
     {

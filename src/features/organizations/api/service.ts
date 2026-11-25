@@ -21,7 +21,15 @@ import type {
   ListOAuthConfigsResponse,
   OAuthConfigResponse,
   OAuthConfigPayload,
-  DeleteOAuthConfigResponse
+  DeleteOAuthConfigResponse,
+  MessageChannelId,
+  ListMessageProviderCatalogResponse,
+  ListMessageProviderConfigsResponse,
+  SetMessageProviderPayload,
+  SetMessageProviderResponse,
+  SetMessageProviderPriorityPayload,
+  SetMessageProviderPriorityResponse,
+  DeleteMessageProviderResponse
 } from './types';
 
 function buildQuery(filters: OrganizationFilters): string {
@@ -101,6 +109,73 @@ export async function deleteOAuthConfig(
   return apiClient<DeleteOAuthConfigResponse>(
     `/organizations/${id}/oauth/${encodeURIComponent(provider)}`,
     { method: 'DELETE' }
+  );
+}
+
+// ---- Message delivery providers ----
+// The backend answers business failures (e.g. the vendor rejected the
+// credentials) with HTTP 200 and a non-zero `code`; surface those as errors so
+// callers see the vendor's message instead of a half-saved state.
+
+function unwrap<T extends { code: number; message: string }>(res: T): T {
+  if (res.code !== 0) {
+    throw new Error(res.message || 'Request failed');
+  }
+  return res;
+}
+
+export async function getMessageProviderCatalog(
+  channel?: MessageChannelId
+): Promise<ListMessageProviderCatalogResponse> {
+  const qs = channel ? `?channel=${encodeURIComponent(channel)}` : '';
+  return unwrap(await apiClient<ListMessageProviderCatalogResponse>(`/message-providers${qs}`));
+}
+
+export async function getMessageProviderConfigs(
+  id: number
+): Promise<ListMessageProviderConfigsResponse> {
+  return unwrap(
+    await apiClient<ListMessageProviderConfigsResponse>(`/organizations/${id}/message-providers`)
+  );
+}
+
+export async function setMessageProvider(
+  id: number,
+  channel: MessageChannelId,
+  provider: string,
+  data: SetMessageProviderPayload
+): Promise<SetMessageProviderResponse> {
+  return unwrap(
+    await apiClient<SetMessageProviderResponse>(
+      `/organizations/${id}/message-providers/${channel}/${encodeURIComponent(provider)}`,
+      { method: 'PUT', body: JSON.stringify(data) }
+    )
+  );
+}
+
+export async function setMessageProviderPriority(
+  id: number,
+  channel: MessageChannelId,
+  data: SetMessageProviderPriorityPayload
+): Promise<SetMessageProviderPriorityResponse> {
+  return unwrap(
+    await apiClient<SetMessageProviderPriorityResponse>(
+      `/organizations/${id}/message-providers/${channel}/priority`,
+      { method: 'PUT', body: JSON.stringify(data) }
+    )
+  );
+}
+
+export async function deleteMessageProvider(
+  id: number,
+  channel: MessageChannelId,
+  provider: string
+): Promise<DeleteMessageProviderResponse> {
+  return unwrap(
+    await apiClient<DeleteMessageProviderResponse>(
+      `/organizations/${id}/message-providers/${channel}/${encodeURIComponent(provider)}`,
+      { method: 'DELETE' }
+    )
   );
 }
 

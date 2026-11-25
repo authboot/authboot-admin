@@ -432,10 +432,7 @@ export function LoginMethodsSettings() {
 
       <div className={cn('text-muted-foreground flex items-start gap-2 px-1 text-xs')}>
         <Icons.info className='mt-0.5 size-4 shrink-0' />
-        <p>
-          Third-party providers need their credentials before they can be enabled. This screen is
-          currently static — the master switch and provider flags are not persisted yet.
-        </p>
+        <p>Third-party providers need their credentials before they can be enabled.</p>
       </div>
 
       {configMethod && (

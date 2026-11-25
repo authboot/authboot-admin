@@ -41,9 +41,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadSession = React.useCallback(async () => {
     let current = await fetchCurrentUser();
+    let refreshed = false;
     if (!current) {
       // Access token may have expired — try a refresh before giving up.
-      const refreshed = await refreshSession();
+      refreshed = await refreshSession();
       if (refreshed) current = await fetchCurrentUser();
     }
     if (!current) {
@@ -58,23 +59,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const orgs = await fetchOrganizations();
     setOrganizations(orgs);
 
-    // Sync the active-org state with the active_org cookie (set by the BFF
-    // on switch, or auto-defaulted to the first org below), so the
-    // OrgSwitcher check mark matches what the overview dashboard shows.
+    // Only the switch endpoint can pair an active workspace with a scoped token.
     const cookieOrg = document.cookie
       .split('; ')
       .find((entry) => entry.startsWith(`${ACTIVE_ORG_COOKIE}=`));
     const cookieOrgId = cookieOrg ? Number(cookieOrg.split('=')[1]) : 0;
-    if (orgs.some((org) => org.id === cookieOrgId)) {
+    const selectedOrg = orgs.find((org) => org.id === cookieOrgId);
+    if (selectedOrg && !refreshed) {
       setActiveOrganizationId(cookieOrgId);
     } else if (orgs.length > 0) {
-      // Default the active org to the first one (mirrors the OrgSwitcher
-      // fallback) so the org-scoped overview dashboard renders right away.
-      const firstOrgId = orgs[0].id;
-      setActiveOrganizationId(firstOrgId);
-      document.cookie = `${ACTIVE_ORG_COOKIE}=${firstOrgId}; path=/; SameSite=Lax`;
+      // Refresh can issue a platform token; bind it to the selected org again.
+      const targetOrgId = (selectedOrg ?? orgs[0]).id;
+      const result = await switchOrganization(targetOrgId);
+      if (result.success) {
+        setActiveOrganizationId(targetOrgId);
+        router.refresh();
+      }
     }
-  }, []);
+  }, [router]);
 
   React.useEffect(() => {
     // Session load is async — the setState calls happen after the fetch

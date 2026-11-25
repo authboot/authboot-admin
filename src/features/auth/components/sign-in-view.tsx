@@ -99,7 +99,7 @@ export default function SignInViewPage() {
             <InputGroupInput
               id='password'
               type={showPassword ? 'text' : 'password'}
-              placeholder='••••••••'
+              placeholder='Enter your password'
               autoComplete='current-password'
               value={password}
               onChange={(e) => setPassword(e.target.value)}

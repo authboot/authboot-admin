@@ -13,6 +13,7 @@ export interface NavItem {
   /** Key under `nav.items` in the message files; falls back to `title` when omitted */
   titleKey?: string;
   url: string;
+  hidden?: boolean;
   disabled?: boolean;
   external?: boolean;
   shortcut?: [string, string];
@@ -28,6 +29,7 @@ export interface NavGroup {
   label: string;
   /** Key under `nav.groups` in the message files; falls back to `label` when omitted */
   labelKey?: string;
+  hidden?: boolean;
   items: NavItem[];
 }
 

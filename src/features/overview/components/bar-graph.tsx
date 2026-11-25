@@ -12,6 +12,7 @@ import {
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { dashboardQueryOptions, isOrgDashboard } from '@/features/overview/api/queries';
 import { getActiveOrgId } from '@/features/overview/api/service';
+import { fillDailyTrend } from '@/features/overview/utils/fill-trend';
 
 const chartConfig = {
   logins: {
@@ -28,10 +29,13 @@ export function BarGraph() {
   const orgId = getActiveOrgId();
   const { data } = useSuspenseQuery(dashboardQueryOptions(orgId));
   const org = isOrgDashboard(data) ? data : null;
-  const chartData = (org?.login_trend_7d ?? []).map((point) => ({
-    date: point.date,
-    logins: point.count
-  }));
+  // The server omits days without logins; zero-fill so all 7 days render.
+  const chartData = org
+    ? fillDailyTrend(org.login_trend_7d ?? [], 7).map((point) => ({
+        date: point.date,
+        logins: point.count
+      }))
+    : [];
 
   return (
     <Card>

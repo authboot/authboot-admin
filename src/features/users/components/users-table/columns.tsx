@@ -1,7 +1,6 @@
 'use client';
 
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { StatusBadge } from '@/components/status-badge';
 import { DataTableColumnHeader } from '@/components/ui/table/data-table-column-header';
 import type { User } from '../../api/types';
 import { Column, ColumnDef } from '@tanstack/react-table';
@@ -32,15 +31,9 @@ export const columns: ColumnDef<User>[] = [
     cell: ({ row }) => {
       const name = `${row.original.first_name} ${row.original.last_name}`.trim() || 'Unnamed';
       return (
-        <div className='flex items-center gap-2'>
-          <Avatar className='size-8 rounded-lg'>
-            <AvatarImage src={row.original.avatar || ''} alt={name} />
-            <AvatarFallback className='text-xs'>{name.slice(0, 2).toUpperCase()}</AvatarFallback>
-          </Avatar>
-          <div className='flex min-w-0 flex-col'>
-            <span className='truncate font-medium'>{name}</span>
-            <span className='text-muted-foreground text-xs'>#{row.original.id}</span>
-          </div>
+        <div className='flex min-w-0 flex-col'>
+          <span className='truncate font-medium'>{name}</span>
+          <span className='text-muted-foreground text-xs'>#{row.original.id}</span>
         </div>
       );
     },
@@ -81,12 +74,7 @@ export const columns: ColumnDef<User>[] = [
   {
     accessorKey: 'status',
     header: 'STATUS',
-    cell: ({ cell }) => {
-      const status = cell.getValue<User['status']>();
-      const variant =
-        status === 'Active' ? 'default' : status === 'Inactive' ? 'secondary' : 'outline';
-      return <Badge variant={variant}>{status}</Badge>;
-    }
+    cell: ({ cell }) => <StatusBadge status={cell.getValue<User['status']>()} />
   },
   {
     accessorKey: 'created_at',

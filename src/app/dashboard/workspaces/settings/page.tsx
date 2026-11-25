@@ -3,9 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Icons } from '@/components/icons';
 import { cookies } from 'next/headers';
 import { ACTIVE_ORG_COOKIE, parseOrgId } from '@/lib/auth-shared';
-import { GeneralSettingsCard } from '@/features/organizations/components/general-settings-card';
-import { LoginMethodsSettings } from '@/features/organizations/components/login-methods-settings';
-import { DangerZoneCard } from '@/features/organizations/components/danger-zone-card';
+import { WorkspaceSettingsView } from '@/features/organizations/components/workspace-settings-view';
 import { workspaceSettingsInfoContent } from '@/config/infoconfig';
 
 export const metadata = {
@@ -19,15 +17,11 @@ export default async function WorkspaceSettingsPage() {
   return (
     <PageContainer
       pageTitle='Workspace Settings'
-      pageDescription='Manage the active workspace: general info, sign-in methods, and ownership.'
+      pageDescription='Manage the active workspace: identity, sign-in rules, verification codes, message delivery, email templates, and maintenance.'
       infoContent={workspaceSettingsInfoContent}
     >
       {orgId ? (
-        <div className='max-w-3xl space-y-4'>
-          <GeneralSettingsCard orgId={orgId} />
-          <LoginMethodsSettings />
-          <DangerZoneCard orgId={orgId} />
-        </div>
+        <WorkspaceSettingsView orgId={orgId} />
       ) : (
         <Card className='max-w-3xl'>
           <CardHeader>

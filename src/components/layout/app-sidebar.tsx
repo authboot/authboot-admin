@@ -35,6 +35,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import * as React from 'react';
 import { Icons } from '../icons';
 import { OrgSwitcher } from '../org-switcher';
+import { PoweredBy } from '../powered-by';
 
 export default function AppSidebar() {
   const pathname = usePathname();
@@ -114,6 +115,8 @@ export default function AppSidebar() {
         ))}
       </SidebarContent>
       <SidebarFooter>
+        {/* Hidden in the icon-only sidebar, where there is no room for it. */}
+        <PoweredBy className='text-sidebar-foreground/60 justify-center overflow-hidden py-1 whitespace-nowrap group-data-[collapsible=icon]:hidden' />
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>

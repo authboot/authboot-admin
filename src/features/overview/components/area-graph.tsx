@@ -12,6 +12,7 @@ import {
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { dashboardQueryOptions, isOrgDashboard } from '@/features/overview/api/queries';
 import { getActiveOrgId } from '@/features/overview/api/service';
+import { fillMonthlyLoginTrend } from '@/features/overview/utils/fill-trend';
 
 const chartConfig = {
   success: {
@@ -32,11 +33,8 @@ export function AreaGraph() {
   const orgId = getActiveOrgId();
   const { data } = useSuspenseQuery(dashboardQueryOptions(orgId));
   const org = isOrgDashboard(data) ? data : null;
-  const chartData = (org?.monthly_login_trend ?? []).map((point) => ({
-    month: point.month,
-    success: point.success,
-    failed: point.failed
-  }));
+  // The server omits months without logins; zero-fill so all 6 months render.
+  const chartData = org ? fillMonthlyLoginTrend(org.monthly_login_trend ?? [], 6) : [];
 
   return (
     <Card>
@@ -62,7 +60,7 @@ export function AreaGraph() {
               </defs>
               <Area
                 dataKey='failed'
-                type='natural'
+                type='monotone'
                 fill='url(#dotted-background-pattern-failed)'
                 fillOpacity={0.4}
                 stroke='var(--color-failed)'
@@ -71,7 +69,7 @@ export function AreaGraph() {
               />
               <Area
                 dataKey='success'
-                type='natural'
+                type='monotone'
                 fill='url(#dotted-background-pattern-success)'
                 fillOpacity={0.4}
                 stroke='var(--color-success)'

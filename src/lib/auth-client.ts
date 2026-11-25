@@ -125,3 +125,25 @@ export async function updateProfile(patch: {
   }
   return { success: true, message: data.message ?? 'Success' };
 }
+
+/**
+ * Replace the signed-in admin's avatar. The image is sent as multipart
+ * form-data (field `avatar`); the backend stores it and updates the profile.
+ */
+export async function uploadAvatar(file: File): Promise<AuthResult> {
+  const form = new FormData();
+  form.append('avatar', file);
+
+  let res: Response;
+  try {
+    // No Content-Type here: the browser sets the multipart boundary itself.
+    res = await fetch('/api/auth/me/avatar', { method: 'POST', body: form });
+  } catch {
+    return { success: false, message: 'Network error — please try again.' };
+  }
+  const data = await res.json().catch(() => ({ message: 'Unexpected response' }));
+  if (!res.ok || data.code !== 0) {
+    return { success: false, message: data.message ?? 'Failed to upload avatar' };
+  }
+  return { success: true, message: data.message ?? 'Success' };
+}

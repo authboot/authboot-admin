@@ -1,15 +1,16 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import PageContainer from '@/components/layout/page-container';
 import { useAuth } from '@/components/auth/auth-provider';
-import { updateProfile } from '@/lib/auth-client';
+import { AvatarUpload } from '@/components/avatar-upload';
+import { updateProfile, uploadAvatar } from '@/lib/auth-client';
 import { useAppForm } from '@/lib/form';
 import { formatDate } from '@/lib/format';
 import type { AuthUser, Organization } from '@/lib/auth-types';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -76,6 +77,24 @@ export function ProfileSettings() {
 function ProfileContent({ user, organization }: { user: AuthUser; organization?: Organization }) {
   const { refresh } = useAuth();
   const name = displayNameOf(user);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  // The avatar is uploaded as soon as an image is picked, independently of the
+  // form below. Refreshing the session updates it in the sidebar/header too.
+  async function handleAvatarSelect(file: File) {
+    setIsUploadingAvatar(true);
+    try {
+      const result = await uploadAvatar(file);
+      if (!result.success) {
+        toast.error("Couldn't update the avatar", { description: result.message });
+        return;
+      }
+      await refresh();
+      toast.success('Avatar updated');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  }
 
   const form = useAppForm({
     defaultValues: { nickname: user.nickname ?? '' },
@@ -97,10 +116,13 @@ function ProfileContent({ user, organization }: { user: AuthUser; organization?:
       <Card className='h-fit gap-0 overflow-hidden py-0 lg:sticky lg:top-4'>
         <div className='from-primary/15 via-primary/5 h-24 bg-gradient-to-br to-transparent' />
         <CardContent className='-mt-10 space-y-4 px-4 pb-4'>
-          <Avatar className='ring-background size-20 shadow-sm ring-4'>
-            <AvatarImage src={user.avatar || ''} alt={name} />
-            <AvatarFallback className='text-xl font-semibold'>{initialsOf(name)}</AvatarFallback>
-          </Avatar>
+          <AvatarUpload
+            src={user.avatar}
+            name={name}
+            initials={initialsOf(name)}
+            isUploading={isUploadingAvatar}
+            onSelect={handleAvatarSelect}
+          />
 
           <div className='min-w-0 space-y-1'>
             <h2 className='truncate text-lg font-semibold'>{name}</h2>

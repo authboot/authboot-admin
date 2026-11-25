@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { PoweredBy } from '@/components/powered-by';
 import { InteractiveGridPattern } from './interactive-grid';
 
 /**
@@ -63,6 +64,8 @@ export function AuthShell({
           {children}
 
           {footer}
+
+          <PoweredBy />
         </div>
       </div>
     </div>

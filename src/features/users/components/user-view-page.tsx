@@ -4,8 +4,6 @@ import { Suspense, useState } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { notFound } from 'next/navigation';
 import { toast } from 'sonner';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -20,11 +18,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import { StatusBadge } from '@/components/status-badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Icons, type Icon } from '@/components/icons';
 import { formatDate } from '@/lib/format';
 import { userByIdOptions } from '../api/queries';
 import UserAddressList from './user-address-list';
+import { UserAvatarUpload } from './user-avatar-upload';
 import { UserFormSheet } from './user-form-sheet';
 import { UserNotes, UserNotesSkeleton } from './user-notes';
 import { UserSecurity, UserSecuritySkeleton } from './user-security';
@@ -43,10 +43,6 @@ function formatCellDate(value: string): string {
 
 // Backend gender enum — keep in sync with authboot-server's profile model.
 const GENDER_LABELS: Record<number, string> = { 1: 'Male', 2: 'Female' };
-
-function statusVariant(status: string) {
-  return status === 'Active' ? 'default' : status === 'Inactive' ? 'secondary' : 'outline';
-}
 
 function MetaRow({
   icon: MetaIcon,
@@ -117,10 +113,12 @@ export default function UserViewPage({ userId }: UserViewPageProps) {
       <Card className='gap-0 overflow-hidden py-0'>
         <div className='from-primary/15 via-primary/5 h-24 bg-gradient-to-br to-transparent' />
         <CardContent className='-mt-10 space-y-4 px-4 pb-4'>
-          <Avatar className='ring-background size-20 shadow-sm ring-4'>
-            <AvatarImage src={user.avatar || ''} alt={fullName} />
-            <AvatarFallback className='text-xl font-semibold'>{initials}</AvatarFallback>
-          </Avatar>
+          <UserAvatarUpload
+            userId={user.id}
+            name={fullName}
+            initials={initials}
+            avatarUrl={user.avatar}
+          />
 
           <div className='min-w-0 space-y-1'>
             <h2 className='truncate text-lg font-semibold'>{fullName}</h2>
@@ -128,7 +126,7 @@ export default function UserViewPage({ userId }: UserViewPageProps) {
           </div>
 
           <div className='flex flex-wrap gap-2'>
-            <Badge variant={statusVariant(user.status)}>{user.status}</Badge>
+            <StatusBadge status={user.status} />
           </div>
 
           {/* Quick actions */}
@@ -268,7 +266,7 @@ export default function UserViewPage({ userId }: UserViewPageProps) {
                   <h3 className='text-sm font-medium'>Account</h3>
                   <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
                     <DetailItem label='Status'>
-                      <Badge variant={statusVariant(user.status)}>{user.status}</Badge>
+                      <StatusBadge status={user.status} />
                     </DetailItem>
                     <DetailItem label='Organization'>
                       {user.organization_id ? (

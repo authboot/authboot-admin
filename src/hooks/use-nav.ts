@@ -71,6 +71,11 @@ export function useFilteredNavItems(items: NavItem[]) {
   const filteredItems = useMemo(() => {
     return items
       .filter((item) => {
+        // Hidden items remain directly accessible by URL.
+        if (item.hidden) {
+          return false;
+        }
+
         // No access restrictions
         if (!item.access) {
           return true;
@@ -126,6 +131,11 @@ export function useFilteredNavItems(items: NavItem[]) {
         // Recursively filter child items
         if (item.items && item.items.length > 0) {
           const filteredChildren = item.items.filter((childItem) => {
+            // Hidden child items remain directly accessible by URL.
+            if (childItem.hidden) {
+              return false;
+            }
+
             // No access restrictions
             if (!childItem.access) {
               return true;
@@ -187,12 +197,13 @@ export function useFilteredNavItems(items: NavItem[]) {
  * @returns Filtered groups (empty groups are removed)
  */
 export function useFilteredNavGroups(groups: NavGroup[]) {
-  const allItems = useMemo(() => groups.flatMap((g) => g.items), [groups]);
+  const visibleGroups = useMemo(() => groups.filter((group) => !group.hidden), [groups]);
+  const allItems = useMemo(() => visibleGroups.flatMap((g) => g.items), [visibleGroups]);
   const filteredItems = useFilteredNavItems(allItems);
 
   return useMemo(() => {
     const filteredSet = new Set(filteredItems.map((item) => item.title));
-    return groups
+    return visibleGroups
       .map((group) => ({
         ...group,
         items: filteredItems.filter((item) =>
@@ -200,5 +211,5 @@ export function useFilteredNavGroups(groups: NavGroup[]) {
         )
       }))
       .filter((group) => group.items.length > 0);
-  }, [groups, filteredItems]);
+  }, [visibleGroups, filteredItems]);
 }

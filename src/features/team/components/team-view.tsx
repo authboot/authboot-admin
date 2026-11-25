@@ -27,20 +27,11 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { Icons, type Icon } from '@/components/icons';
+import { StatusBadge } from '@/components/status-badge';
 import { formatDate } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { teamMembersOptions } from '../api/queries';
 import type { TeamMember, TeamMemberStatus } from '../api/types';
-
-const STATUS_LABELS: Record<TeamMemberStatus, string> = {
-  active: 'Active',
-  invited: 'Invited',
-  suspended: 'Suspended'
-};
-
-function statusVariant(status: TeamMemberStatus) {
-  return status === 'active' ? 'default' : status === 'invited' ? 'outline' : 'destructive';
-}
 
 function formatShortDate(value: string): string {
   return formatDate(value, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -240,9 +231,7 @@ export function TeamView() {
                         <Badge variant='outline'>{member.role}</Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={statusVariant(member.status)}>
-                          {STATUS_LABELS[member.status]}
-                        </Badge>
+                        <StatusBadge status={member.status} />
                       </TableCell>
                       <TableCell>
                         <span

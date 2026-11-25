@@ -154,6 +154,26 @@ export async function updateUser(id: number, data: UserMutationPayload) {
   });
 }
 
+// Avatar upload is multipart/form-data — bypass apiClient so the browser sets
+// the multipart boundary itself (never set Content-Type manually here).
+// The BFF forwards the file part named `avatar` to authboot-server.
+export async function uploadUserAvatar(id: number, file: File): Promise<UserByIdResponse> {
+  const form = new FormData();
+  form.append('avatar', file);
+
+  const res = await fetch(`/api/users/${id}/avatar`, {
+    method: 'POST',
+    body: form
+  });
+
+  const body = (await res.json().catch(() => null)) as UserByIdResponse | null;
+  if (!res.ok || !body?.success) {
+    throw new Error(body?.message || `API error: ${res.status} ${res.statusText}`);
+  }
+
+  return body;
+}
+
 export async function deleteUser(id: number) {
   return apiClient(`/users/${id}`, {
     method: 'DELETE'

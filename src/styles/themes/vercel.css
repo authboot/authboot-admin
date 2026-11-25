@@ -1,6 +1,6 @@
 [data-theme='vercel'] {
   --background: oklch(0.99 0 0);
-  --foreground: oklch(0 0 0);
+  --foreground: oklch(0% 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0 0 0);
   --popover: oklch(0.99 0 0);
@@ -104,6 +104,27 @@
   --shadow-lg: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 4px 6px -1px hsl(0 0% 0% / 0.18);
   --shadow-xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 8px 10px -1px hsl(0 0% 0% / 0.18);
   --shadow-2xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.45);
+}
+
+/* Accent only filled primary buttons; badges and navigation keep the neutral palette. */
+[data-theme='vercel'] .group\/button.bg-primary {
+  --primary: #0066db;
+  --primary-foreground: #fff;
+  --ring: #0066db;
+  --button-hover: #0056bd;
+}
+
+[data-theme='vercel'].dark .group\/button.bg-primary {
+  --primary: #70b4ff;
+  --primary-foreground: #08182b;
+  --ring: #70b4ff;
+  --button-hover: #96c9ff;
+}
+
+@media (hover: hover) {
+  [data-theme='vercel'] .group\/button.bg-primary:hover:not(:disabled) {
+    background-color: var(--button-hover);
+  }
 }
 
 [data-theme='vercel'] {

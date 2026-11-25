@@ -3,6 +3,7 @@ import { getQueryClient } from '@/lib/query-client';
 import {
   createUser,
   updateUser,
+  uploadUserAvatar,
   deleteUser,
   updateUserAddress,
   createUserNote,
@@ -21,6 +22,13 @@ export const createUserMutation = mutationOptions({
 export const updateUserMutation = mutationOptions({
   mutationFn: ({ id, values }: { id: number; values: UserMutationPayload }) =>
     updateUser(id, values),
+  onSuccess: () => {
+    getQueryClient().invalidateQueries({ queryKey: userKeys.all });
+  }
+});
+
+export const uploadUserAvatarMutation = mutationOptions({
+  mutationFn: ({ id, file }: { id: number; file: File }) => uploadUserAvatar(id, file),
   onSuccess: () => {
     getQueryClient().invalidateQueries({ queryKey: userKeys.all });
   }

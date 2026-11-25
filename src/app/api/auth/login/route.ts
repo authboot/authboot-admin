@@ -6,7 +6,8 @@
 // access/refresh tokens in httpOnly cookies on success.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { authbootBaseUrl, setAuthCookies } from '@/lib/auth';
+import { cookies } from 'next/headers';
+import { ACTIVE_ORG_COOKIE, authbootBaseUrl, setAuthCookies } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -45,5 +46,7 @@ export async function POST(request: NextRequest) {
     data.refresh_token_expires_at
   );
 
+  // A new login starts with a platform token, even for a returning admin.
+  (await cookies()).delete(ACTIVE_ORG_COOKIE);
   return NextResponse.json(data);
 }

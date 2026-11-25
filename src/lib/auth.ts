@@ -50,17 +50,20 @@ function cookieOptions(expiresAt?: number) {
 
 export async function setAuthCookies(
   accessToken: string,
-  refreshToken: string,
+  refreshToken: string | undefined,
   accessTokenExpiresAt?: number,
   refreshTokenExpiresAt?: number
 ): Promise<void> {
   const store = await cookies();
   store.set(AUTH_COOKIE_ACCESS, accessToken, cookieOptions(accessTokenExpiresAt));
-  store.set(AUTH_COOKIE_REFRESH, refreshToken, cookieOptions(refreshTokenExpiresAt));
+  if (refreshToken !== undefined) {
+    store.set(AUTH_COOKIE_REFRESH, refreshToken, cookieOptions(refreshTokenExpiresAt));
+  }
 }
 
 export async function clearAuthCookies(): Promise<void> {
   const store = await cookies();
   store.delete(AUTH_COOKIE_ACCESS);
   store.delete(AUTH_COOKIE_REFRESH);
+  store.delete(ACTIVE_ORG_COOKIE);
 }

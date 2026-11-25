@@ -46,9 +46,10 @@ export async function POST(request: NextRequest) {
 
   // The switched token keeps the same server-side session; only the access
   // token is re-scoped. Refresh token is untouched.
-  if (data.access_token) {
-    await setAuthCookies(data.access_token, data.refresh_token ?? '', data.access_token_expires_at);
+  if (!data.access_token) {
+    return NextResponse.json({ code: 1, message: 'Missing workspace token' }, { status: 502 });
   }
+  await setAuthCookies(data.access_token, undefined, data.access_token_expires_at);
 
   // Remember the active org for the overview dashboard (org-scoped data).
   const cookieStore = await cookies();

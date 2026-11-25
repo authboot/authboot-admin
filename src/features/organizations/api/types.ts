@@ -108,3 +108,85 @@ export type DeleteOAuthConfigResponse = {
   code: number;
   message: string;
 };
+
+// ---- Message delivery providers (email / sms) ----
+// Mirrors message_provider.proto. The catalog is served by the backend
+// registry; saved configs hold per-organization credentials with secret
+// fields masked on read.
+export type MessageChannelId = 'email' | 'sms';
+
+export type MessageProviderField = {
+  name: string;
+  label: string;
+  secret: boolean;
+  required: boolean;
+  placeholder: string;
+  type: 'text' | 'password' | 'number' | 'boolean';
+};
+
+export type MessageProviderDescriptor = {
+  channel: MessageChannelId;
+  provider: string;
+  name: string;
+  description: string;
+  fields: MessageProviderField[];
+  platform_default: boolean;
+};
+
+/**
+ * A saved provider. `priority` is the send order: 1 = default provider,
+ * 2.. = fallbacks tried in turn, 0 = saved but not used for sending.
+ */
+export type MessageProviderConfig = {
+  organization_id: number;
+  channel: MessageChannelId;
+  provider: string;
+  settings: Record<string, string>;
+  enabled: boolean;
+  priority: number;
+  verified_at: number;
+  created_at: number;
+  updated_at: number;
+};
+
+export type ListMessageProviderCatalogResponse = {
+  code: number;
+  message: string;
+  providers: MessageProviderDescriptor[];
+};
+
+export type ListMessageProviderConfigsResponse = {
+  code: number;
+  message: string;
+  configs: MessageProviderConfig[];
+  total: number;
+};
+
+/** Secret fields left empty keep the stored value. */
+export type SetMessageProviderPayload = {
+  settings: Record<string, string>;
+  /** Where the validation message goes; empty = the current admin's email. */
+  test_recipient?: string;
+};
+
+export type SetMessageProviderResponse = {
+  code: number;
+  message: string;
+  config: MessageProviderConfig;
+};
+
+export type SetMessageProviderPriorityPayload = {
+  primary: string;
+  fallbacks: string[];
+};
+
+export type SetMessageProviderPriorityResponse = {
+  code: number;
+  message: string;
+  configs: MessageProviderConfig[];
+};
+
+export type DeleteMessageProviderResponse = {
+  code: number;
+  message: string;
+};

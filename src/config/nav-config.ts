@@ -84,6 +84,7 @@ export const navGroups: NavGroup[] = [
       },
       {
         title: 'Product',
+        hidden: true,
         titleKey: 'product',
         url: '/dashboard/product',
         icon: 'product',
@@ -102,6 +103,7 @@ export const navGroups: NavGroup[] = [
       },
       {
         title: 'Security',
+        hidden: true,
         titleKey: 'security',
         url: '/dashboard/security',
         icon: 'shieldCheck',
@@ -111,6 +113,7 @@ export const navGroups: NavGroup[] = [
       },
       {
         title: 'Kanban',
+        hidden: true,
         titleKey: 'kanban',
         url: '/dashboard/kanban',
         icon: 'kanban',
@@ -141,6 +144,7 @@ export const navGroups: NavGroup[] = [
   {
     label: 'Elements',
     labelKey: 'elements',
+    hidden: true,
     items: [
       {
         title: 'Forms',
@@ -200,6 +204,7 @@ export const navGroups: NavGroup[] = [
       {
         title: 'Pro',
         titleKey: 'pro',
+        hidden: true,
         url: '#',
         icon: 'pro',
         isActive: false,
@@ -216,6 +221,7 @@ export const navGroups: NavGroup[] = [
       {
         title: 'Account',
         titleKey: 'account',
+        hidden: true,
         url: '#',
         icon: 'account',
         isActive: true,

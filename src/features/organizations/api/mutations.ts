@@ -6,13 +6,19 @@ import {
   deleteOrganization,
   leaveOrganization,
   setOAuthConfig,
-  deleteOAuthConfig
+  deleteOAuthConfig,
+  setMessageProvider,
+  setMessageProviderPriority,
+  deleteMessageProvider
 } from './service';
 import { organizationKeys } from './queries';
 import type {
   CreateOrganizationPayload,
   UpdateOrganizationPayload,
-  OAuthConfigPayload
+  OAuthConfigPayload,
+  MessageChannelId,
+  SetMessageProviderPayload,
+  SetMessageProviderPriorityPayload
 } from './types';
 
 export const createOrganizationMutation = mutationOptions({
@@ -64,5 +70,54 @@ export const deleteOAuthConfigMutation = mutationOptions({
     deleteOAuthConfig(id, provider),
   onSuccess: (_data, { id }) => {
     getQueryClient().invalidateQueries({ queryKey: organizationKeys.oauth(id) });
+  }
+});
+
+// ---- Message delivery providers ----
+
+export const setMessageProviderMutation = mutationOptions({
+  mutationFn: ({
+    id,
+    channel,
+    provider,
+    values
+  }: {
+    id: number;
+    channel: MessageChannelId;
+    provider: string;
+    values: SetMessageProviderPayload;
+  }) => setMessageProvider(id, channel, provider, values),
+  onSuccess: (_data, { id }) => {
+    getQueryClient().invalidateQueries({ queryKey: organizationKeys.messageProviders(id) });
+  }
+});
+
+export const setMessageProviderPriorityMutation = mutationOptions({
+  mutationFn: ({
+    id,
+    channel,
+    values
+  }: {
+    id: number;
+    channel: MessageChannelId;
+    values: SetMessageProviderPriorityPayload;
+  }) => setMessageProviderPriority(id, channel, values),
+  onSuccess: (_data, { id }) => {
+    getQueryClient().invalidateQueries({ queryKey: organizationKeys.messageProviders(id) });
+  }
+});
+
+export const deleteMessageProviderMutation = mutationOptions({
+  mutationFn: ({
+    id,
+    channel,
+    provider
+  }: {
+    id: number;
+    channel: MessageChannelId;
+    provider: string;
+  }) => deleteMessageProvider(id, channel, provider),
+  onSuccess: (_data, { id }) => {
+    getQueryClient().invalidateQueries({ queryKey: organizationKeys.messageProviders(id) });
   }
 });
