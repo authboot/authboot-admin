@@ -6,6 +6,7 @@ import SearchInput from '../search-input';
 import { ThemeSelector } from '../themes/theme-selector';
 import { ThemeModeToggle } from '../themes/theme-mode-toggle';
 import CtaGithub from './cta-github';
+import { HeaderPoweredBy } from './header-powered-by';
 import { LocaleSelector } from '../i18n/locale-selector';
 import { NotificationCenter } from '@/features/notifications/components/notification-center';
 
@@ -16,6 +17,7 @@ export default function Header() {
         <SidebarTrigger className='-ml-1' />
         <Separator orientation='vertical' className='mr-2 h-4 data-vertical:self-center' />
         <Breadcrumbs />
+        <HeaderPoweredBy />
       </div>
 
       <div className='flex items-center gap-2 px-4'>

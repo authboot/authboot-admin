@@ -46,6 +46,13 @@ export async function GET(request: NextRequest) {
   const limit = Number(searchParams.get('limit') ?? 10);
   const pageSize = Number.isInteger(limit) && limit > 0 ? limit : 10;
   const safePage = Number.isInteger(page) && page > 0 ? page : 1;
+  // Optional filters, forwarded verbatim; the backend validates them.
+  const forwarded = new URLSearchParams();
+  for (const key of ['search', 'user_name', 'email', 'phone', 'status', 'sort']) {
+    const value = searchParams.get(key);
+    if (value) forwarded.set(key, value);
+  }
+  const forwardedQs = forwarded.toString() ? `&${forwarded}` : '';
 
   const token = await getAccessToken();
   if (!token) {
@@ -91,7 +98,7 @@ export async function GET(request: NextRequest) {
     // organization_id must also appear as a query param: the backend IDL
     // binds ListUsersRequest via form/query (the path annotation is missing).
     res = await fetch(
-      `${authbootBaseUrl()}/admin/organizations/${orgId}/users?organization_id=${orgId}&page=${safePage}&page_size=${pageSize}`,
+      `${authbootBaseUrl()}/admin/organizations/${orgId}/users?organization_id=${orgId}&page=${safePage}&page_size=${pageSize}${forwardedQs}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
   } catch {

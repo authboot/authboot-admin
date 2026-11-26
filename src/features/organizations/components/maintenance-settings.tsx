@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { useMutation, useSuspenseQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
+import { formatDateTime } from '@/lib/format';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -24,6 +26,7 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import { FieldGroup } from '@/components/ui/field';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { Switch } from '@/components/ui/switch';
 import { Icons } from '@/components/icons';
 import { StatusBadge } from '@/components/status-badge';
@@ -35,12 +38,45 @@ import {
   maintenanceNoticeSchema,
   type MaintenanceNotice
 } from '../schemas/workspace-policies';
+import { organizationSettingsQueryOptions } from '../api/queries';
+import { updateOrganizationSettingsMutation } from '../api/mutations';
+import type { OrganizationMaintenance } from '../api/types';
 
 type MaintenanceSettingsProps = {
+  orgId: number;
   organizationName: string;
-  enabled: boolean;
-  onEnabledChange: (enabled: boolean) => void;
 };
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Request failed';
+}
+
+/** Unix seconds → `datetime-local` value in the browser's zone, or '' for 0. */
+function toLocalInput(unix: number): string {
+  if (!unix) return '';
+  return format(new Date(unix * 1000), "yyyy-MM-dd'T'HH:mm");
+}
+
+/** `datetime-local` value → unix seconds, 0 for empty/invalid. */
+function fromLocalInput(value: string): number {
+  if (!value) return 0;
+  const ms = new Date(value).getTime();
+  return Number.isNaN(ms) ? 0 : Math.floor(ms / 1000);
+}
+
+function toApi(notice: MaintenanceNotice): Partial<OrganizationMaintenance> {
+  return {
+    title: notice.title,
+    message: notice.message,
+    expected_end: fromLocalInput(notice.expectedEnd)
+  };
+}
+
+/** The saved notice as the form sees it; an untouched workspace shows the default. */
+function noticeOf(m: OrganizationMaintenance): MaintenanceNotice {
+  if (!m.title && !m.message) return DEFAULT_MAINTENANCE_NOTICE;
+  return { title: m.title, message: m.message, expectedEnd: toLocalInput(m.expected_end) };
+}
 
 const NOTICE_FORM_ID = 'maintenance-notice-form';
 
@@ -54,7 +90,7 @@ const MAINTENANCE_EFFECTS = [
 function formatExpectedEnd(value: string): string | null {
   if (!value) return null;
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : format(date, 'MMM d, yyyy, h:mm a');
+  return Number.isNaN(date.getTime()) ? null : formatDateTime(date);
 }
 
 function isSameNotice(a: MaintenanceNotice, b: MaintenanceNotice): boolean {
@@ -92,49 +128,70 @@ function NoticePreview({
 }
 
 /**
- * Maintenance mode for the active workspace: the on/off switch (confirmed
- * before it takes users offline) and the notice shown while it is on.
- *
- * Static version — the switch state is owned by the settings view and the
- * notice lives in this component; nothing is sent to the backend yet.
+ * Maintenance mode for a workspace: the on/off switch (confirmed before it
+ * takes users offline) and the notice shown while it is on. Both live in the
+ * organization's settings on the server; while on, the backend rejects user
+ * sign-in, sign-up and password reset for this workspace.
  */
-export function MaintenanceSettings({
-  organizationName,
-  enabled,
-  onEnabledChange
-}: MaintenanceSettingsProps) {
+export function MaintenanceSettings({ orgId, organizationName }: MaintenanceSettingsProps) {
+  const { data } = useSuspenseQuery(organizationSettingsQueryOptions(orgId));
+  const settings = data.settings;
+  const maintenance = settings.maintenance;
+  const enabled = maintenance.enabled;
+  const startedAt = maintenance.started_at ? new Date(maintenance.started_at * 1000) : null;
   // The last saved notice — what users would see if maintenance were turned on.
-  const [savedNotice, setSavedNotice] = useState<MaintenanceNotice>(DEFAULT_MAINTENANCE_NOTICE);
+  const savedNotice = noticeOf(maintenance);
+
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [startedAt, setStartedAt] = useState<Date | null>(null);
+  const mutation = useMutation(updateOrganizationSettingsMutation);
+
+  // PUT replaces the whole settings object, so only the maintenance block changes.
+  function save(next: Partial<OrganizationMaintenance>) {
+    return mutation.mutateAsync({
+      id: orgId,
+      settings: { ...settings, maintenance: { ...maintenance, ...next } }
+    });
+  }
 
   const form = useAppForm({
     defaultValues: savedNotice,
     validators: { onChange: maintenanceNoticeSchema },
-    onSubmit: ({ value, formApi }) => {
+    onSubmit: async ({ value, formApi }) => {
       const notice = maintenanceNoticeSchema.parse(value);
-      setSavedNotice(notice);
-      formApi.reset(notice);
-      toast.success('Maintenance notice saved');
+      try {
+        await save(toApi(notice));
+        formApi.reset(notice);
+        toast.success('Maintenance notice saved');
+      } catch (error) {
+        toast.error(errorMessage(error));
+      }
     }
   });
 
-  function handleToggle(next: boolean) {
+  async function handleToggle(next: boolean) {
     // Taking users offline is confirmed first; bringing them back is not.
     if (next) {
       setConfirmOpen(true);
       return;
     }
-    onEnabledChange(false);
-    setStartedAt(null);
-    toast.success('Maintenance mode is off');
+    try {
+      await save({ enabled: false });
+      toast.success('Maintenance mode is off');
+    } catch (error) {
+      toast.error(errorMessage(error));
+    }
   }
 
-  function handleConfirm() {
-    onEnabledChange(true);
-    setStartedAt(new Date());
+  async function handleConfirm() {
     setConfirmOpen(false);
-    toast.success('Maintenance mode is on');
+    try {
+      // Turning on also persists the notice shown in the confirmation, so a
+      // never-saved default notice is what users actually see.
+      await save({ enabled: true, ...toApi(savedNotice) });
+      toast.success('Maintenance mode is on');
+    } catch (error) {
+      toast.error(errorMessage(error));
+    }
   }
 
   return (
@@ -165,14 +222,15 @@ export function MaintenanceSettings({
               </p>
               <p className='text-muted-foreground text-xs'>
                 {enabled
-                  ? `Users have seen the notice since ${startedAt ? format(startedAt, 'h:mm a') : 'it was turned on'}.`
+                  ? `Users have seen the notice since ${startedAt ? formatDateTime(startedAt, 'time') : 'it was turned on'}.`
                   : 'Users can sign in and sign up as usual.'}
               </p>
             </div>
             <Switch
               checked={enabled}
+              disabled={mutation.isPending}
               aria-label={`Turn maintenance mode ${enabled ? 'off' : 'on'}`}
-              onCheckedChange={handleToggle}
+              onCheckedChange={(next) => void handleToggle(next)}
             />
           </div>
 
@@ -266,9 +324,15 @@ export function MaintenanceSettings({
                   >
                     Discard changes
                   </Button>
-                  <Button type='submit' form={NOTICE_FORM_ID} disabled={!isDirty}>
+                  <LoadingButton
+                    type='submit'
+                    form={NOTICE_FORM_ID}
+                    loading={mutation.isPending}
+                    loadingLabel='Saving…'
+                    disabled={!isDirty}
+                  >
                     Save notice
-                  </Button>
+                  </LoadingButton>
                 </>
               );
             }}
@@ -287,7 +351,9 @@ export function MaintenanceSettings({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirm}>Turn on maintenance</AlertDialogAction>
+            <AlertDialogAction onClick={() => void handleConfirm()}>
+              Turn on maintenance
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

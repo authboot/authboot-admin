@@ -4,7 +4,10 @@ import {
   getOrganizationById,
   getOAuthConfigs,
   getMessageProviderCatalog,
-  getMessageProviderConfigs
+  getMessageProviderConfigs,
+  getEmailTemplateCatalog,
+  getEmailTemplateOverrides,
+  getOrganizationSettings
 } from './service';
 import { listLegalVersions } from './legal-service';
 import type { LegalDocType } from '../constants/legal-documents';
@@ -17,11 +20,14 @@ export const organizationKeys = {
   list: (filters: OrganizationFilters) => [...organizationKeys.all, 'list', filters] as const,
   detail: (id: number) => [...organizationKeys.all, 'detail', id] as const,
   oauth: (id: number) => [...organizationKeys.all, 'oauth', id] as const,
+  settings: (id: number) => [...organizationKeys.all, 'settings', id] as const,
   // Message delivery: the provider catalog is global (backend registry); the
   // saved configs are per organization.
   messageProviderCatalog: (channel?: MessageChannelId) =>
     ['message-providers', 'catalog', channel ?? 'all'] as const,
   messageProviders: (id: number) => [...organizationKeys.all, 'message-providers', id] as const,
+  emailTemplateCatalog: () => ['email-templates', 'catalog'] as const,
+  emailTemplates: (id: number) => [...organizationKeys.all, 'email-templates', id] as const,
   // Legal documents: immutable version history per doc type, served by the
   // backend. Publishing invalidates ['organizations','legal'] wholesale.
   legal: (docType: LegalDocType) => [...organizationKeys.all, 'legal', docType] as const
@@ -63,4 +69,23 @@ export const messageProvidersQueryOptions = (id: number) =>
   queryOptions({
     queryKey: organizationKeys.messageProviders(id),
     queryFn: () => getMessageProviderConfigs(id)
+  });
+
+export const emailTemplateCatalogQueryOptions = () =>
+  queryOptions({
+    queryKey: organizationKeys.emailTemplateCatalog(),
+    queryFn: () => getEmailTemplateCatalog(),
+    staleTime: 5 * 60 * 1000
+  });
+
+export const emailTemplatesQueryOptions = (id: number) =>
+  queryOptions({
+    queryKey: organizationKeys.emailTemplates(id),
+    queryFn: () => getEmailTemplateOverrides(id)
+  });
+
+export const organizationSettingsQueryOptions = (id: number) =>
+  queryOptions({
+    queryKey: organizationKeys.settings(id),
+    queryFn: () => getOrganizationSettings(id)
   });

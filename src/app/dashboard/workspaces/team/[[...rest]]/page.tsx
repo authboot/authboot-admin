@@ -1,8 +1,5 @@
-import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
 import PageContainer from '@/components/layout/page-container';
-import { getQueryClient } from '@/lib/query-client';
 import { teamInfoContent } from '@/config/infoconfig';
-import { teamMembersOptions } from '@/features/team/api/queries';
 import { InviteAdminButton } from '@/features/team/components/invite-admin-sheet';
 import { TeamView } from '@/features/team/components/team-view';
 
@@ -10,20 +7,17 @@ export const metadata = {
   title: 'Dashboard: Team'
 };
 
+// The active organization is only known client-side (auth provider), so the
+// roster is fetched in the browser instead of prefetched on the server.
 export default function TeamPage() {
-  const queryClient = getQueryClient();
-  void queryClient.prefetchQuery(teamMembersOptions());
-
   return (
     <PageContainer
       pageTitle='Team'
-      pageDescription='Admins with access to this workspace. Static preview until membership APIs land.'
+      pageDescription='Admins with access to this workspace and pending invitations.'
       infoContent={teamInfoContent}
       pageHeaderAction={<InviteAdminButton />}
     >
-      <HydrationBoundary state={dehydrate(queryClient)}>
-        <TeamView />
-      </HydrationBoundary>
+      <TeamView />
     </PageContainer>
   );
 }

@@ -116,7 +116,10 @@ export default function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
         {/* Hidden in the icon-only sidebar, where there is no room for it. */}
-        <PoweredBy className='text-sidebar-foreground/60 justify-center overflow-hidden py-1 whitespace-nowrap group-data-[collapsible=icon]:hidden' />
+        <PoweredBy
+          size='lg'
+          className='text-sidebar-foreground/60 flex w-full justify-center overflow-hidden px-3 py-1 whitespace-nowrap group-data-[collapsible=icon]:hidden'
+        />
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>

@@ -42,7 +42,7 @@ export function LegalSettings() {
   }
 
   return (
-    <div className='max-w-4xl space-y-4'>
+    <div className='space-y-4'>
       <Tabs defaultValue='terms' className='gap-4'>
         <TabsList variant='line'>
           <TabsTrigger value='terms'>

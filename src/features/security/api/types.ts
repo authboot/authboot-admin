@@ -1,14 +1,21 @@
 // ============================================================
 // Security — Type Contract
 // ============================================================
-// One record shape per table family. `scope` selects which backend tables
-// feed the UI:
-//   admin → tb_admin_login_logs / tb_admin_audit_logs / tb_admin_sessions / tb_admin_devices
-//   user  → tb_user_login_logs  / tb_user_audit_logs  / tb_user_sessions  / tb_user_devices
-// The admin views keep an `account` field; user views omit it because the
-// records already belong to the signed-in account.
+// Record shapes consumed by the tables, plus the backend DTOs they are mapped
+// from. `scope` selects the data source:
+//   admin → organization-wide: app users' sign-in attempts and admins' audit log
+//   user  → the signed-in admin's own sign-in history and audit entries
+// Admin-scope records carry an `account` label; user-scope ones omit it.
 
 export type SecurityScope = 'admin' | 'user';
+
+/** Who is asking; drives which backend endpoint and filters are used. */
+export type SecurityContext = {
+  /** Active organization; 0 when none is selected. */
+  orgId: number;
+  /** Signed-in admin account id. */
+  adminId: number;
+};
 
 export type LoginLogRecord = {
   id: string;
@@ -35,34 +42,68 @@ export type AuditLogRecord = {
   created_at: string;
 };
 
-export type SessionRecord = {
-  id: string;
-  /** Session owner — admin views only. */
-  account?: string;
-  device: string;
+// ---- Backend DTOs (idl/audit.proto, idl/admin.proto) ----
+
+export type BackendAuditLog = {
+  id: number;
+  admin_id: number;
+  organization_id: number;
+  action: string;
+  resource_type: string;
+  resource_id: string;
+  method: string;
+  path: string;
   ip: string;
-  location: string;
-  status: 'active' | 'revoked';
-  /** The session issuing the current request. */
-  current?: boolean;
-  last_active_at: string;
+  user_agent: string;
+  success: boolean;
+  status_code: number;
+  err_msg: string;
+  created_at: number;
 };
 
-export type DeviceRecord = {
-  id: string;
-  /** Device owner — admin views only. */
-  account?: string;
-  name: string;
-  os: string;
-  browser: string;
-  ip: string;
-  trusted: boolean;
-  last_seen_at: string;
+export type ListAuditLogsResponse = {
+  code: number;
+  message: string;
+  logs: BackendAuditLog[];
+  total: number;
 };
 
-/** Per-user security bundle shown on the admin user detail page. */
-export type AccountSecurityOverview = {
-  sessions: SessionRecord[];
-  loginLogs: LoginLogRecord[];
-  auditLogs: AuditLogRecord[];
+export type BackendUserLoginLog = {
+  id: number;
+  user_id: number;
+  identity_type: string;
+  identity_value: string;
+  device_id: string;
+  device_name: string;
+  ip: string;
+  user_agent: string;
+  success: boolean;
+  err_msg: string;
+  created_at: number;
+};
+
+export type ListUserLoginLogsResponse = {
+  code: number;
+  message: string;
+  logs: BackendUserLoginLog[];
+  total: number;
+};
+
+export type BackendAdminLoginLog = {
+  id: number;
+  email: string;
+  device_id: string;
+  device_name: string;
+  ip: string;
+  user_agent: string;
+  success: boolean;
+  err_msg: string;
+  created_at: number;
+};
+
+export type ListMyLoginLogsResponse = {
+  code: number;
+  message: string;
+  logs: BackendAdminLoginLog[];
+  total: number;
 };

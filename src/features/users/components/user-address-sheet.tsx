@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -14,8 +14,7 @@ import {
   SheetTitle
 } from '@/components/ui/sheet';
 import { useAppForm } from '@/lib/form';
-import { updateUserAddressMutation } from '../api/mutations';
-import { userKeys } from '../api/queries';
+import { createUserAddressMutation, updateUserAddressMutation } from '../api/mutations';
 import type { UserAddress } from '../api/types';
 
 const addressSchema = z.object({
@@ -30,56 +29,62 @@ const addressSchema = z.object({
 
 type UserAddressSheetProps = {
   userId: number;
-  address: UserAddress;
+  /** The address to edit; omit to create a new one. */
+  address?: UserAddress;
   onClose: () => void;
 };
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Request failed';
+}
+
 /**
- * Edit one saved address. Rendering is conditional in the parent (mount per
- * address), so the form's default values always match the row being edited.
+ * Create or edit one saved address. Rendering is conditional in the parent
+ * (mount per address), so the form's default values always match the row.
  */
 export function UserAddressSheet({ userId, address, onClose }: UserAddressSheetProps) {
-  const queryClient = useQueryClient();
-
-  const mutation = useMutation({
-    mutationFn: updateUserAddressMutation.mutationFn,
-    onError: () => toast.error("Couldn't update the address. Try again.")
-  });
+  const editing = Boolean(address);
+  const createMutation = useMutation(createUserAddressMutation);
+  const updateMutation = useMutation(updateUserAddressMutation);
+  const pending = createMutation.isPending || updateMutation.isPending;
 
   const form = useAppForm({
     defaultValues: {
-      receiver_name: address.receiver_name,
-      receiver_phone: address.receiver_phone,
-      province: address.province,
-      city: address.city,
-      district: address.district,
-      detail: address.detail,
-      is_default: address.is_default
+      receiver_name: address?.receiver_name ?? '',
+      receiver_phone: address?.receiver_phone ?? '',
+      province: address?.province ?? '',
+      city: address?.city ?? '',
+      district: address?.district ?? '',
+      detail: address?.detail ?? '',
+      is_default: address?.is_default ?? false
     },
     validators: { onSubmit: addressSchema },
     onSubmit: async ({ value }) => {
-      const result = await mutation.mutateAsync({
-        id: userId,
-        address: { ...address, ...value }
-      });
-
-      if (!result?.success) {
-        toast.error(result?.message || 'Failed to update the address');
-        return;
+      try {
+        if (address) {
+          await updateMutation.mutateAsync({ id: userId, addressId: address.id, values: value });
+          toast.success('Address updated');
+        } else {
+          await createMutation.mutateAsync({ id: userId, values: value });
+          toast.success('Address added');
+        }
+        onClose();
+      } catch (error) {
+        toast.error(errorMessage(error));
       }
-
-      queryClient.invalidateQueries({ queryKey: userKeys.addresses(userId) });
-      toast.success('Address updated');
-      onClose();
     }
   });
 
   return (
-    <Sheet open onOpenChange={(open) => !open && onClose()}>
+    <Sheet open onOpenChange={(open) => !open && !pending && onClose()}>
       <SheetContent className='flex flex-col'>
         <SheetHeader>
-          <SheetTitle>Edit address</SheetTitle>
-          <SheetDescription>Update the delivery details for #{address.id}.</SheetDescription>
+          <SheetTitle>{editing ? 'Edit address' : 'Add address'}</SheetTitle>
+          <SheetDescription>
+            {editing
+              ? `Update the delivery details for #${address?.id}.`
+              : 'Add a delivery address to this user. Each user can have up to 10.'}
+          </SheetDescription>
         </SheetHeader>
 
         <div className='flex-1 overflow-auto'>
@@ -158,11 +163,13 @@ export function UserAddressSheet({ userId, address, onClose }: UserAddressSheetP
         </div>
 
         <SheetFooter>
-          <Button type='button' variant='outline' onClick={onClose}>
+          <Button type='button' variant='outline' disabled={pending} onClick={onClose}>
             Cancel
           </Button>
           <form.AppForm>
-            <form.SubmitButton form='user-address-form'>Save changes</form.SubmitButton>
+            <form.SubmitButton form='user-address-form'>
+              {editing ? 'Save changes' : 'Add address'}
+            </form.SubmitButton>
           </form.AppForm>
         </SheetFooter>
       </SheetContent>

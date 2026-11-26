@@ -7,16 +7,28 @@ import brandLogo from '../../public/logo-transparent.png';
 const BRAND_NAME = 'AuthBoot';
 const BRAND_URL = 'https://github.com/authboot';
 
-// Rendered height in px (Tailwind h-7). Passing the matching width keeps
-// next/image from generating full-resolution variants of the 2172px source.
-const LOGO_HEIGHT = 28;
-const LOGO_WIDTH = Math.round((LOGO_HEIGHT * brandLogo.width) / brandLogo.height);
+type PoweredBySize = 'sm' | 'lg';
+
+// Rendered logo height per size in px (Tailwind h-7 / h-9). Passing the
+// matching width keeps next/image from generating full-resolution variants of
+// the 2172px source. The artwork has transparent padding above and below (it
+// fills ~56% of its height), so the visible mark is roughly half of this.
+const SIZES: Record<PoweredBySize, { height: number; logo: string; text: string; gap: string }> = {
+  sm: { height: 28, logo: 'h-7', text: 'text-xs', gap: 'gap-1' },
+  lg: { height: 36, logo: 'h-9', text: 'text-xs', gap: 'gap-1' }
+};
+
+function logoWidth(height: number): number {
+  return Math.round((height * brandLogo.width) / brandLogo.height);
+}
 
 type PoweredByProps = {
   /** Lead-in text, e.g. "Powered by" or "Secured by". */
   label?: string;
   /** Where the logo links to (opens in a new tab). Defaults to AuthBoot on GitHub. */
   href?: string;
+  /** `sm` for the bottom of forms; `lg` fills the width of the sidebar. */
+  size?: PoweredBySize;
   className?: string;
 };
 
@@ -25,11 +37,19 @@ type PoweredByProps = {
  * brand logo (mark + wordmark), which links to the project. Meant for the
  * bottom of auth forms and similar low-emphasis spots.
  */
-export function PoweredBy({ label = 'Powered by', href = BRAND_URL, className }: PoweredByProps) {
+export function PoweredBy({
+  label = 'Powered by',
+  href = BRAND_URL,
+  size = 'sm',
+  className
+}: PoweredByProps) {
+  const s = SIZES[size];
   return (
     <p
       className={cn(
-        'text-muted-foreground inline-flex items-center gap-1 text-xs font-medium select-none',
+        'text-muted-foreground inline-flex items-center font-medium select-none',
+        s.gap,
+        s.text,
         className
       )}
     >
@@ -48,9 +68,9 @@ export function PoweredBy({ label = 'Powered by', href = BRAND_URL, className }:
         <Image
           src={brandLogo}
           alt={BRAND_NAME}
-          width={LOGO_WIDTH}
-          height={LOGO_HEIGHT}
-          className='h-7 w-auto'
+          width={logoWidth(s.height)}
+          height={s.height}
+          className={cn('w-auto', s.logo)}
         />
       </a>
     </p>

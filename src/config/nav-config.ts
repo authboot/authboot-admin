@@ -74,15 +74,6 @@ export const navGroups: NavGroup[] = [
         access: { requireOrg: true }
       },
       {
-        title: 'Legal',
-        titleKey: 'legal',
-        url: '/dashboard/workspaces/legal',
-        icon: 'page',
-        isActive: false,
-        items: [],
-        access: { requireOrg: true }
-      },
-      {
         title: 'Product',
         hidden: true,
         titleKey: 'product',

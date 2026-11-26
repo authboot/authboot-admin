@@ -1,15 +1,47 @@
 'use client';
 
 import { useState } from 'react';
-import { useSuspenseQuery } from '@tanstack/react-query';
+import { useMutation, useSuspenseQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 import { Icons } from '@/components/icons';
 import { formatDate } from '@/lib/format';
 import { userAddressesOptions } from '../api/queries';
+import { deleteUserAddressMutation, setDefaultUserAddressMutation } from '../api/mutations';
 import type { UserAddress } from '../api/types';
 import { UserAddressSheet } from './user-address-sheet';
+
+const ADDRESS_LIMIT = 10;
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Request failed';
+}
 
 type UserAddressListProps = {
   userId: string;
@@ -18,7 +50,33 @@ type UserAddressListProps = {
 export default function UserAddressList({ userId }: UserAddressListProps) {
   const { data } = useSuspenseQuery(userAddressesOptions(Number(userId)));
   const addresses = data?.addresses ?? [];
-  const [editing, setEditing] = useState<UserAddress | null>(null);
+  // `sheet` is null (closed), 'new' (create) or the address being edited.
+  const [sheet, setSheet] = useState<UserAddress | 'new' | null>(null);
+  const [removing, setRemoving] = useState<UserAddress | null>(null);
+  const id = Number(userId);
+
+  const setDefaultMutation = useMutation(setDefaultUserAddressMutation);
+  const deleteMutation = useMutation(deleteUserAddressMutation);
+  const busy = setDefaultMutation.isPending || deleteMutation.isPending;
+
+  async function handleSetDefault(address: UserAddress) {
+    try {
+      await setDefaultMutation.mutateAsync({ id, addressId: address.id });
+      toast.success('Default address updated');
+    } catch (error) {
+      toast.error(errorMessage(error));
+    }
+  }
+
+  async function handleDelete(address: UserAddress) {
+    setRemoving(null);
+    try {
+      await deleteMutation.mutateAsync({ id, addressId: address.id });
+      toast.success('Address deleted');
+    } catch (error) {
+      toast.error(errorMessage(error));
+    }
+  }
 
   return (
     <Card className='flex flex-1 flex-col'>
@@ -29,6 +87,18 @@ export default function UserAddressList({ userId }: UserAddressListProps) {
           {addresses.length > 0 && <Badge variant='secondary'>{addresses.length}</Badge>}
         </CardTitle>
         <CardDescription>Saved delivery addresses for this user.</CardDescription>
+        <CardAction>
+          <Button
+            type='button'
+            variant='outline'
+            size='sm'
+            disabled={addresses.length >= ADDRESS_LIMIT}
+            onClick={() => setSheet('new')}
+          >
+            <Icons.add />
+            Add address
+          </Button>
+        </CardAction>
       </CardHeader>
       <CardContent className='flex flex-1 flex-col'>
         {addresses.length === 0 ? (
@@ -74,15 +144,49 @@ export default function UserAddressList({ userId }: UserAddressListProps) {
                         Added {formatDate(address.created_at)}
                       </span>
                     )}
-                    <Button
-                      type='button'
-                      variant='outline'
-                      size='sm'
-                      onClick={() => setEditing(address)}
-                    >
-                      <Icons.edit className='size-3.5' />
-                      Edit
-                    </Button>
+                    <div className='flex items-center gap-1'>
+                      <Button
+                        type='button'
+                        variant='outline'
+                        size='sm'
+                        disabled={busy}
+                        onClick={() => setSheet(address)}
+                      >
+                        <Icons.edit className='size-3.5' />
+                        Edit
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              type='button'
+                              variant='ghost'
+                              size='icon-sm'
+                              disabled={busy}
+                              aria-label={`More actions for address #${address.id}`}
+                            />
+                          }
+                        >
+                          <Icons.ellipsis />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align='end' className='min-w-44'>
+                          {!address.is_default && (
+                            <DropdownMenuItem onClick={() => void handleSetDefault(address)}>
+                              <Icons.check />
+                              Set as default
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant='destructive'
+                            onClick={() => setRemoving(address)}
+                          >
+                            <Icons.trash />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                 </div>
               );
@@ -91,12 +195,37 @@ export default function UserAddressList({ userId }: UserAddressListProps) {
         )}
       </CardContent>
 
-      {editing && (
+      {sheet && (
         <UserAddressSheet
-          userId={Number(userId)}
-          address={editing}
-          onClose={() => setEditing(null)}
+          key={sheet === 'new' ? 'new' : sheet.id}
+          userId={id}
+          address={sheet === 'new' ? undefined : sheet}
+          onClose={() => setSheet(null)}
         />
+      )}
+
+      {removing && (
+        <AlertDialog open onOpenChange={(open) => !open && setRemoving(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this address?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {removing.receiver_name},{' '}
+                {[removing.province, removing.city, removing.district].filter(Boolean).join(' ')}{' '}
+                {removing.detail}.
+                {removing.is_default && addresses.length > 1
+                  ? ' Another address becomes the default.'
+                  : ''}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction variant='destructive' onClick={() => void handleDelete(removing)}>
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </Card>
   );

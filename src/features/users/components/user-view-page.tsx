@@ -26,7 +26,6 @@ import { userByIdOptions } from '../api/queries';
 import UserAddressList from './user-address-list';
 import { UserAvatarUpload } from './user-avatar-upload';
 import { UserFormSheet } from './user-form-sheet';
-import { UserNotes, UserNotesSkeleton } from './user-notes';
 import { UserSecurity, UserSecuritySkeleton } from './user-security';
 
 type UserViewPageProps = {
@@ -219,10 +218,6 @@ export default function UserViewPage({ userId }: UserViewPageProps) {
                 <Icons.shieldCheck />
                 Security
               </TabsTrigger>
-              <TabsTrigger value='notes'>
-                <Icons.post />
-                Notes
-              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -333,12 +328,6 @@ export default function UserViewPage({ userId }: UserViewPageProps) {
           <TabsContent value='security'>
             <Suspense fallback={<UserSecuritySkeleton />}>
               <UserSecurity userId={userId} />
-            </Suspense>
-          </TabsContent>
-
-          <TabsContent value='notes'>
-            <Suspense fallback={<UserNotesSkeleton />}>
-              <UserNotes userId={Number(userId)} />
             </Suspense>
           </TabsContent>
         </Tabs>

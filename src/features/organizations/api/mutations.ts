@@ -9,7 +9,11 @@ import {
   deleteOAuthConfig,
   setMessageProvider,
   setMessageProviderPriority,
-  deleteMessageProvider
+  deleteMessageProvider,
+  setEmailTemplate,
+  resetEmailTemplate,
+  sendTestEmailTemplate,
+  updateOrganizationSettings
 } from './service';
 import { organizationKeys } from './queries';
 import type {
@@ -18,7 +22,10 @@ import type {
   OAuthConfigPayload,
   MessageChannelId,
   SetMessageProviderPayload,
-  SetMessageProviderPriorityPayload
+  SetMessageProviderPriorityPayload,
+  SetEmailTemplatePayload,
+  SendTestEmailTemplatePayload,
+  OrganizationSettings
 } from './types';
 
 export const createOrganizationMutation = mutationOptions({
@@ -119,5 +126,54 @@ export const deleteMessageProviderMutation = mutationOptions({
   }) => deleteMessageProvider(id, channel, provider),
   onSuccess: (_data, { id }) => {
     getQueryClient().invalidateQueries({ queryKey: organizationKeys.messageProviders(id) });
+  }
+});
+
+// ---- Email templates ----
+
+export const setEmailTemplateMutation = mutationOptions({
+  mutationFn: ({
+    id,
+    templateId,
+    values
+  }: {
+    id: number;
+    templateId: string;
+    values: SetEmailTemplatePayload;
+  }) => setEmailTemplate(id, templateId, values),
+  onSuccess: (_data, { id }) => {
+    getQueryClient().invalidateQueries({ queryKey: organizationKeys.emailTemplates(id) });
+  }
+});
+
+export const resetEmailTemplateMutation = mutationOptions({
+  mutationFn: ({ id, templateId }: { id: number; templateId: string }) =>
+    resetEmailTemplate(id, templateId),
+  onSuccess: (_data, { id }) => {
+    getQueryClient().invalidateQueries({ queryKey: organizationKeys.emailTemplates(id) });
+  }
+});
+
+export const sendTestEmailTemplateMutation = mutationOptions({
+  mutationFn: ({
+    id,
+    templateId,
+    values
+  }: {
+    id: number;
+    templateId: string;
+    values: SendTestEmailTemplatePayload;
+  }) => sendTestEmailTemplate(id, templateId, values)
+});
+
+// ---- Organization settings ----
+
+export const updateOrganizationSettingsMutation = mutationOptions({
+  mutationFn: ({ id, settings }: { id: number; settings: OrganizationSettings }) =>
+    updateOrganizationSettings(id, settings),
+  onSuccess: (data, { id }) => {
+    // The response is the effective settings; seed the cache so the UI does not
+    // flash the old state before the refetch lands.
+    getQueryClient().setQueryData(organizationKeys.settings(id), data);
   }
 });

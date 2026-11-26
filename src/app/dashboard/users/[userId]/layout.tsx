@@ -9,7 +9,7 @@ export default function UserDetailLayout({ children }: { children: ReactNode }) 
   return (
     <PageContainer
       pageTitle='User details'
-      pageDescription='Profile, contact information, addresses, security and admin notes for this user.'
+      pageDescription='Profile, contact information, addresses and security for this user.'
       pageHeaderAction={
         <Link
           href='/dashboard/users'

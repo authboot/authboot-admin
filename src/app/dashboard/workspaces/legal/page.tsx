@@ -1,17 +1,7 @@
-import PageContainer from '@/components/layout/page-container';
-import { LegalSettings } from '@/features/organizations/components/legal-settings';
+import { redirect } from 'next/navigation';
 
-export const metadata = {
-  title: 'Dashboard: Legal Documents'
-};
-
+// Legal documents moved into Workspace Settings; keep the old address working
+// for bookmarks and links.
 export default function LegalPage() {
-  return (
-    <PageContainer
-      pageTitle='Legal documents'
-      pageDescription='Terms of Service and Privacy Policy for this workspace.'
-    >
-      <LegalSettings />
-    </PageContainer>
-  );
+  redirect('/dashboard/workspaces/settings?tab=legal');
 }

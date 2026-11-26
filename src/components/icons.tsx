@@ -1,5 +1,6 @@
 import {
   IconAdjustmentsHorizontal,
+  IconFilter,
   IconAlertCircle,
   IconAlertTriangle,
   IconArrowRight,
@@ -227,6 +228,7 @@ export const Icons = {
   eye: IconEye,
   shieldCheck: IconShieldCheck,
   adjustments: IconAdjustmentsHorizontal,
+  filter: IconFilter,
 
   // Text formatting
   bold: IconBold,

@@ -2,7 +2,7 @@
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/format';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { dashboardQueryOptions, isOrgDashboard } from '@/features/overview/api/queries';
 import { getActiveOrgId } from '@/features/overview/api/service';
@@ -41,7 +41,7 @@ export function RecentUsers() {
                   <p className='text-muted-foreground text-sm'>{user.identity || 'No contact'}</p>
                 </div>
                 <div className='text-muted-foreground ml-auto text-sm'>
-                  {format(new Date(user.created_at * 1000), 'MMM d, yyyy')}
+                  {formatDate(user.created_at * 1000)}
                 </div>
               </div>
             ))}

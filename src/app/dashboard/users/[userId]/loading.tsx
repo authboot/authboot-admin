@@ -38,7 +38,7 @@ export default function Loading() {
       </Card>
       <div className='min-w-0 space-y-4'>
         <div className='flex h-9 items-center gap-2 overflow-hidden'>
-          {['Profile', 'Addresses', 'Security', 'Notes'].map((tab) => (
+          {['Profile', 'Addresses', 'Security'].map((tab) => (
             <Skeleton key={tab} className='h-7 w-20' />
           ))}
         </div>

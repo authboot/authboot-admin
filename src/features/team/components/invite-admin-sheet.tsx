@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -14,10 +15,11 @@ import {
   SheetTitle
 } from '@/components/ui/sheet';
 import { Icons } from '@/components/icons';
+import { useAuth } from '@/components/auth/auth-provider';
 import { useAppForm } from '@/lib/form';
+import { inviteAdminMutation } from '../api/mutations';
 
 const inviteSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Enter a valid email address')
 });
 
@@ -28,17 +30,29 @@ type InviteAdminSheetProps = {
   onOpenChange: (open: boolean) => void;
 };
 
-/** Static invite flow — no membership API is wired up yet. */
+/**
+ * Invite an admin by email. The backend creates a pending invitation and
+ * emails a token; the invitee joins as `admin` and can be changed afterwards.
+ */
 export function InviteAdminSheet({ open, onOpenChange }: InviteAdminSheetProps) {
+  const { activeOrganizationId } = useAuth();
+  const mutation = useMutation(inviteAdminMutation);
   const form = useAppForm({
-    defaultValues: { name: '', email: '' } as InviteValues,
+    defaultValues: { email: '' } as InviteValues,
     validators: { onSubmit: inviteSchema },
     onSubmit: async ({ value }) => {
-      // Simulate the request so the loading state is visible in demos.
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      toast.success(`Invitation sent to ${value.email} (demo)`);
-      form.reset();
-      onOpenChange(false);
+      if (!activeOrganizationId) {
+        toast.error('Select a workspace first');
+        return;
+      }
+      try {
+        await mutation.mutateAsync({ orgId: activeOrganizationId, email: value.email.trim() });
+        toast.success(`Invitation sent to ${value.email}`);
+        form.reset();
+        onOpenChange(false);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Request failed');
+      }
     }
   });
 
@@ -48,7 +62,7 @@ export function InviteAdminSheet({ open, onOpenChange }: InviteAdminSheetProps) 
         <SheetHeader>
           <SheetTitle>Invite admin</SheetTitle>
           <SheetDescription>
-            Workspace membership is admin-only, so the invitee receives full admin access.
+            Send an email invitation to join this workspace&apos;s admin console.
           </SheetDescription>
         </SheetHeader>
 
@@ -62,12 +76,6 @@ export function InviteAdminSheet({ open, onOpenChange }: InviteAdminSheetProps) 
             }}
           >
             <FieldGroup>
-              <form.AppField
-                name='name'
-                children={(field) => (
-                  <field.TextField label='Full name' required placeholder='Jane Doe' />
-                )}
-              />
               <form.AppField
                 name='email'
                 children={(field) => (
@@ -85,8 +93,9 @@ export function InviteAdminSheet({ open, onOpenChange }: InviteAdminSheetProps) 
                 <div className='space-y-1'>
                   <p className='text-sm font-medium'>Role: Admin</p>
                   <p className='text-muted-foreground text-xs'>
-                    This workspace does not have granular roles yet. Every member can manage
-                    settings, members, and integrations.
+                    The invitee joins as an admin. You can change the role from the roster after
+                    they accept. Invitations expire automatically; use &ldquo;Resend&rdquo; to issue
+                    a fresh one.
                   </p>
                 </div>
               </div>
@@ -95,7 +104,12 @@ export function InviteAdminSheet({ open, onOpenChange }: InviteAdminSheetProps) 
         </div>
 
         <SheetFooter>
-          <Button type='button' variant='outline' onClick={() => onOpenChange(false)}>
+          <Button
+            type='button'
+            variant='outline'
+            disabled={mutation.isPending}
+            onClick={() => onOpenChange(false)}
+          >
             Cancel
           </Button>
           <form.AppForm>

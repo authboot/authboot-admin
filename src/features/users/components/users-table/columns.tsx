@@ -39,7 +39,7 @@ export const columns: ColumnDef<User>[] = [
     },
     meta: {
       label: 'Name',
-      placeholder: 'Search users...',
+      placeholder: 'Search by name, email or phone…',
       variant: 'text' as const,
       icon: Icons.text
     },
@@ -48,6 +48,8 @@ export const columns: ColumnDef<User>[] = [
   {
     accessorKey: 'email',
     header: 'EMAIL',
+    meta: { label: 'Email', placeholder: 'Contains…', variant: 'text' as const },
+    enableColumnFilter: true,
     cell: ({ row }) =>
       row.original.email ? (
         <a
@@ -64,6 +66,8 @@ export const columns: ColumnDef<User>[] = [
   {
     accessorKey: 'phone',
     header: 'PHONE',
+    meta: { label: 'Phone', placeholder: 'Contains…', variant: 'text' as const },
+    enableColumnFilter: true,
     cell: ({ row }) =>
       row.original.phone ? (
         <span className='text-sm whitespace-nowrap'>{row.original.phone}</span>
@@ -74,6 +78,15 @@ export const columns: ColumnDef<User>[] = [
   {
     accessorKey: 'status',
     header: 'STATUS',
+    meta: {
+      label: 'Status',
+      variant: 'select' as const,
+      options: [
+        { label: 'Active', value: '1' },
+        { label: 'Disabled', value: '2' }
+      ]
+    },
+    enableColumnFilter: true,
     cell: ({ cell }) => <StatusBadge status={cell.getValue<User['status']>()} />
   },
   {

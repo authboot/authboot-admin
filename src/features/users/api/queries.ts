@@ -3,7 +3,6 @@ import {
   getUsers,
   getUserById,
   getUserAddresses,
-  getUserNotes,
   getUserSessions,
   getUserLoginLogs
 } from './service';
@@ -18,7 +17,6 @@ export const userKeys = {
   list: (filters: UserFilters) => [...userKeys.all, 'list', filters] as const,
   detail: (id: number) => [...userKeys.all, 'detail', id] as const,
   addresses: (id: number) => [...userKeys.all, 'addresses', id] as const,
-  notes: (id: number) => [...userKeys.all, 'notes', id] as const,
   sessions: (id: number) => [...userKeys.all, 'sessions', id] as const,
   loginLogs: (id: number, filters: UserLoginLogFilters) =>
     [...userKeys.all, 'login-logs', id, filters] as const
@@ -40,12 +38,6 @@ export const userAddressesOptions = (id: number) =>
   queryOptions({
     queryKey: userKeys.addresses(id),
     queryFn: () => getUserAddresses(id)
-  });
-
-export const userNotesOptions = (id: number) =>
-  queryOptions({
-    queryKey: userKeys.notes(id),
-    queryFn: () => getUserNotes(id)
   });
 
 export const userSessionsOptions = (id: number) =>

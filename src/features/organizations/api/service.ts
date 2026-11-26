@@ -29,7 +29,18 @@ import type {
   SetMessageProviderResponse,
   SetMessageProviderPriorityPayload,
   SetMessageProviderPriorityResponse,
-  DeleteMessageProviderResponse
+  DeleteMessageProviderResponse,
+  ListEmailTemplateCatalogResponse,
+  ListEmailTemplateOverridesResponse,
+  SetEmailTemplatePayload,
+  SetEmailTemplateResponse,
+  ResetEmailTemplateResponse,
+  PreviewEmailTemplatePayload,
+  PreviewEmailTemplateResponse,
+  SendTestEmailTemplatePayload,
+  SendTestEmailTemplateResponse,
+  OrganizationSettings,
+  OrganizationSettingsResponse
 } from './types';
 
 function buildQuery(filters: OrganizationFilters): string {
@@ -176,6 +187,90 @@ export async function deleteMessageProvider(
       `/organizations/${id}/message-providers/${channel}/${encodeURIComponent(provider)}`,
       { method: 'DELETE' }
     )
+  );
+}
+
+// ---- Email templates ----
+
+export async function getEmailTemplateCatalog(): Promise<ListEmailTemplateCatalogResponse> {
+  return unwrap(await apiClient<ListEmailTemplateCatalogResponse>('/email-templates'));
+}
+
+export async function getEmailTemplateOverrides(
+  id: number
+): Promise<ListEmailTemplateOverridesResponse> {
+  return unwrap(
+    await apiClient<ListEmailTemplateOverridesResponse>(`/organizations/${id}/email-templates`)
+  );
+}
+
+export async function setEmailTemplate(
+  id: number,
+  templateId: string,
+  data: SetEmailTemplatePayload
+): Promise<SetEmailTemplateResponse> {
+  return unwrap(
+    await apiClient<SetEmailTemplateResponse>(
+      `/organizations/${id}/email-templates/${encodeURIComponent(templateId)}`,
+      { method: 'PUT', body: JSON.stringify(data) }
+    )
+  );
+}
+
+export async function resetEmailTemplate(
+  id: number,
+  templateId: string
+): Promise<ResetEmailTemplateResponse> {
+  return unwrap(
+    await apiClient<ResetEmailTemplateResponse>(
+      `/organizations/${id}/email-templates/${encodeURIComponent(templateId)}`,
+      { method: 'DELETE' }
+    )
+  );
+}
+
+export async function previewEmailTemplate(
+  id: number,
+  templateId: string,
+  data: PreviewEmailTemplatePayload
+): Promise<PreviewEmailTemplateResponse> {
+  return unwrap(
+    await apiClient<PreviewEmailTemplateResponse>(
+      `/organizations/${id}/email-templates/${encodeURIComponent(templateId)}/preview`,
+      { method: 'POST', body: JSON.stringify(data) }
+    )
+  );
+}
+
+export async function sendTestEmailTemplate(
+  id: number,
+  templateId: string,
+  data: SendTestEmailTemplatePayload
+): Promise<SendTestEmailTemplateResponse> {
+  return unwrap(
+    await apiClient<SendTestEmailTemplateResponse>(
+      `/organizations/${id}/email-templates/${encodeURIComponent(templateId)}/test`,
+      { method: 'POST', body: JSON.stringify(data) }
+    )
+  );
+}
+
+// ---- Organization settings ----
+
+export async function getOrganizationSettings(id: number): Promise<OrganizationSettingsResponse> {
+  return unwrap(await apiClient<OrganizationSettingsResponse>(`/organizations/${id}/settings`));
+}
+
+/** Whole-object replace: send the full settings, not just the changed block. */
+export async function updateOrganizationSettings(
+  id: number,
+  settings: OrganizationSettings
+): Promise<OrganizationSettingsResponse> {
+  return unwrap(
+    await apiClient<OrganizationSettingsResponse>(`/organizations/${id}/settings`, {
+      method: 'PUT',
+      body: JSON.stringify({ settings })
+    })
   );
 }
 

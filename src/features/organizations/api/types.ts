@@ -190,3 +190,128 @@ export type DeleteMessageProviderResponse = {
   code: number;
   message: string;
 };
+
+// ---- Email templates (per-organization overrides) ----
+// Mirrors email_template.proto. The catalog is the backend registry with the
+// built-in default wording; an override replaces subject and body for one
+// organization. Both use Go html/template syntax.
+export type EmailTemplateVariableDto = {
+  name: string;
+  description: string;
+  sample: string;
+  required: boolean;
+};
+
+export type EmailTemplateDescriptor = {
+  template_id: string;
+  name: string;
+  trigger: string;
+  variables: EmailTemplateVariableDto[];
+  default_subject: string;
+  default_body: string;
+};
+
+export type EmailTemplateOverride = {
+  organization_id: number;
+  template_id: string;
+  subject: string;
+  body: string;
+  created_at: number;
+  updated_at: number;
+};
+
+export type ListEmailTemplateCatalogResponse = {
+  code: number;
+  message: string;
+  templates: EmailTemplateDescriptor[];
+};
+
+export type ListEmailTemplateOverridesResponse = {
+  code: number;
+  message: string;
+  overrides: EmailTemplateOverride[];
+};
+
+export type SetEmailTemplatePayload = {
+  subject: string;
+  body: string;
+};
+
+export type SetEmailTemplateResponse = {
+  code: number;
+  message: string;
+  override: EmailTemplateOverride;
+};
+
+export type ResetEmailTemplateResponse = {
+  code: number;
+  message: string;
+};
+
+export type PreviewEmailTemplatePayload = {
+  subject?: string;
+  body?: string;
+};
+
+export type PreviewEmailTemplateResponse = {
+  code: number;
+  message: string;
+  subject: string;
+  html: string;
+};
+
+export type SendTestEmailTemplatePayload = {
+  subject?: string;
+  body?: string;
+  recipient?: string;
+};
+
+export type SendTestEmailTemplateResponse = {
+  code: number;
+  message: string;
+};
+
+// ---- Organization settings (tb_organization.settings JSON) ----
+// Mirrors organization.proto. PUT replaces the whole object, so callers read
+// the current settings, change one block and send everything back.
+export type OrganizationLoginMethods = {
+  email_password: boolean;
+  email_code: boolean;
+  phone_code: boolean;
+  oauth_providers: string[];
+};
+
+export type OrganizationMaintenance = {
+  enabled: boolean;
+  title: string;
+  message: string;
+  /** Unix seconds; 0 = not set. */
+  expected_end: number;
+  /** Unix seconds, stamped by the server when maintenance turns on; 0 when off. */
+  started_at: number;
+};
+
+export type OrganizationSettings = {
+  admin_token_ttl_seconds: number;
+  login_methods: OrganizationLoginMethods;
+  maintenance: OrganizationMaintenance;
+  /** Absent from responses of backends older than the policy feature. */
+  password_policy?: OrganizationPasswordPolicy;
+};
+
+export type OrganizationSettingsResponse = {
+  code: number;
+  message: string;
+  settings: OrganizationSettings;
+};
+
+/** Mirrors organization.proto PasswordPolicy; max length is fixed at 72 server-side. */
+export type OrganizationPasswordPolicy = {
+  min_length: number;
+  require_lowercase: boolean;
+  require_uppercase: boolean;
+  require_digit: boolean;
+  require_symbol: boolean;
+  /** Shown to users when a password is rejected; empty = server-generated. */
+  hint: string;
+};

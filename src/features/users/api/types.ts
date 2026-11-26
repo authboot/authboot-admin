@@ -3,7 +3,14 @@ export type { User } from '@/constants/mock-api-users';
 export type UserFilters = {
   page?: number;
   limit?: number;
+  /** Matches username, email or phone. */
   search?: string;
+  user_name?: string;
+  email?: string;
+  phone?: string;
+  /** Backend common.Status: 1 enabled, 2 disabled. */
+  status?: number;
+  /** created_at_desc (default) | created_at_asc | updated_at_desc | updated_at_asc */
   sort?: string;
 };
 
@@ -41,6 +48,15 @@ export type UserAddressesResponse = {
   success: boolean;
   message: string;
   addresses: UserAddress[];
+};
+
+/** Fields an admin can set; mirrors Admin{Create,Update}AddressRequest. */
+export type UserAddressPayload = Omit<UserAddress, 'id' | 'created_at' | 'updated_at'>;
+
+export type UserAddressResponse = {
+  success: boolean;
+  message: string;
+  address?: UserAddress;
 };
 
 export type UserSessionStatus = 'active' | 'revoked' | 'expired' | 'unknown';
@@ -107,21 +123,3 @@ export type UserMutationPayload = {
 };
 
 /** Internal admin note attached to a user account. */
-export type UserNote = {
-  id: number;
-  user_id: number;
-  author: string;
-  body: string;
-  created_at: string;
-};
-
-export type UserNotesResponse = {
-  success: boolean;
-  message: string;
-  notes: UserNote[];
-};
-
-export type UserNotePayload = {
-  body: string;
-  author?: string;
-};

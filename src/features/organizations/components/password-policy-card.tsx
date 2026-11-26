@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useMutation, useSuspenseQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,6 +12,7 @@ import {
   CardHeader,
   CardTitle
 } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Field,
   FieldContent,
@@ -20,30 +22,29 @@ import {
   FieldTitle
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Icons } from '@/components/icons';
 import { StatusBadge } from '@/components/status-badge';
 import { cn } from '@/lib/utils';
 import {
   CUSTOM_PASSWORD_POLICY,
-  DEFAULT_PASSWORD_POLICY_ID,
+  DEFAULT_PASSWORD_POLICY,
+  PASSWORD_HINT_MAX,
   PASSWORD_MAX_LENGTH,
-  PASSWORD_POLICY_PRESET_BY_ID,
-  PASSWORD_POLICY_PRESETS
+  PASSWORD_MIN_LENGTH_FLOOR,
+  PASSWORD_POLICY_PRESETS,
+  defaultHintFor,
+  presetIdFor,
+  requirementsFor,
+  type PasswordRules
 } from '../constants/password-policy';
+import { organizationSettingsQueryOptions } from '../api/queries';
+import { updateOrganizationSettingsMutation } from '../api/mutations';
+import type { OrganizationPasswordPolicy } from '../api/types';
 
-type PasswordPolicy = {
-  /** A preset id, or 'custom'. */
-  mode: string;
-  /** Only used in custom mode — presets carry their own pattern and hint. */
-  customPattern: string;
-  customHint: string;
-};
-
-const DEFAULT_POLICY: PasswordPolicy = {
-  mode: DEFAULT_PASSWORD_POLICY_ID,
-  customPattern: '',
-  customHint: ''
+type PasswordPolicyCardProps = {
+  orgId: number;
 };
 
 const POLICY_OPTIONS = [
@@ -55,54 +56,80 @@ const POLICY_OPTIONS = [
   {
     id: CUSTOM_PASSWORD_POLICY,
     name: 'Custom',
-    description: 'Write your own regular expression.'
+    description: 'Pick the length and character classes yourself.'
   }
 ];
 
-function compilePattern(pattern: string): { regex: RegExp | null; error: string | null } {
-  if (!pattern) return { regex: null, error: null };
-  try {
-    return { regex: new RegExp(pattern), error: null };
-  } catch (error) {
-    return {
-      regex: null,
-      error: error instanceof Error ? error.message : 'Invalid regular expression'
-    };
-  }
+const FLAGS: { key: keyof Omit<PasswordRules, 'min_length'>; label: string }[] = [
+  { key: 'require_lowercase', label: 'A lowercase letter' },
+  { key: 'require_uppercase', label: 'An uppercase letter' },
+  { key: 'require_digit', label: 'A number' },
+  { key: 'require_symbol', label: 'A symbol' }
+];
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Request failed';
 }
 
-function isSamePolicy(a: PasswordPolicy, b: PasswordPolicy): boolean {
-  return a.mode === b.mode && a.customPattern === b.customPattern && a.customHint === b.customHint;
+function isSamePolicy(a: OrganizationPasswordPolicy, b: OrganizationPasswordPolicy): boolean {
+  return (
+    a.min_length === b.min_length &&
+    a.require_lowercase === b.require_lowercase &&
+    a.require_uppercase === b.require_uppercase &&
+    a.require_digit === b.require_digit &&
+    a.require_symbol === b.require_symbol &&
+    a.hint.trim() === b.hint.trim()
+  );
 }
 
 /**
- * Password rule for accounts in the active workspace: one of the presets or a
- * custom regular expression, the hint shown when a password is rejected, and
- * a tester to try the rule before saving it.
- *
- * Static version — the policy lives in this component and is not sent to the
- * backend yet.
+ * Password rule for accounts in the active workspace: a preset or custom
+ * combination of minimum length and required character classes, the hint
+ * shown when a password is rejected, and a tester. Saved in the
+ * organization's settings and enforced by the backend on register, change
+ * and reset.
  */
-export function PasswordPolicyCard() {
-  const [saved, setSaved] = useState<PasswordPolicy>(DEFAULT_POLICY);
-  const [draft, setDraft] = useState<PasswordPolicy>(DEFAULT_POLICY);
+export function PasswordPolicyCard({ orgId }: PasswordPolicyCardProps) {
+  const { data } = useSuspenseQuery(organizationSettingsQueryOptions(orgId));
+  const settings = data.settings;
+  // Older backends / cached responses may lack the field; fall back to the server default.
+  const saved = settings.password_policy ?? DEFAULT_PASSWORD_POLICY;
+
+  const [draft, setDraft] = useState<OrganizationPasswordPolicy>(saved);
   const [sample, setSample] = useState('');
+  const mutation = useMutation(updateOrganizationSettingsMutation);
 
-  const isCustom = draft.mode === CUSTOM_PASSWORD_POLICY;
-  const preset = PASSWORD_POLICY_PRESET_BY_ID.get(draft.mode);
-  const pattern = isCustom ? draft.customPattern.trim() : (preset?.pattern ?? '');
-  const hint = isCustom ? draft.customHint.trim() : (preset?.hint ?? '');
-  const { regex, error: patternError } = compilePattern(pattern);
+  const presetId = presetIdFor(draft);
+  const requirements = requirementsFor(draft);
+  const effectiveHint = draft.hint.trim() || defaultHintFor(draft);
 
+  const minLengthInvalid =
+    !Number.isInteger(draft.min_length) ||
+    draft.min_length < PASSWORD_MIN_LENGTH_FLOOR ||
+    draft.min_length > PASSWORD_MAX_LENGTH;
   const isDirty = !isSamePolicy(draft, saved);
-  const canSave = isDirty && (!isCustom || (regex !== null && hint.length > 0));
+  const canSave = isDirty && !minLengthInvalid && draft.hint.length <= PASSWORD_HINT_MAX;
 
   const tooLong = sample.length > PASSWORD_MAX_LENGTH;
-  const sampleAccepted = regex !== null && !tooLong && regex.test(sample);
+  const sampleAccepted = !tooLong && requirements.every((r) => r.test(sample));
 
-  function handleSave() {
-    setSaved(draft);
-    toast.success('Password policy saved');
+  function selectPreset(id: string) {
+    if (id === CUSTOM_PASSWORD_POLICY) return; // keep current rules, just unlock editing
+    const preset = PASSWORD_POLICY_PRESETS.find((p) => p.id === id);
+    if (preset) setDraft((prev) => ({ ...prev, ...preset.rules }));
+  }
+
+  async function handleSave() {
+    try {
+      // PUT replaces the whole settings object; only the policy changes here.
+      await mutation.mutateAsync({
+        id: orgId,
+        settings: { ...settings, password_policy: { ...draft, hint: draft.hint.trim() } }
+      });
+      toast.success('Password policy saved');
+    } catch (error) {
+      toast.error(errorMessage(error));
+    }
   }
 
   return (
@@ -119,10 +146,10 @@ export function PasswordPolicyCard() {
       </CardHeader>
       <CardContent className='space-y-5'>
         <RadioGroup
-          value={draft.mode}
+          value={presetId}
           aria-label='Password rule'
           className='grid gap-2 sm:grid-cols-2'
-          onValueChange={(value) => setDraft((prev) => ({ ...prev, mode: String(value) }))}
+          onValueChange={(value) => selectPreset(String(value))}
         >
           {POLICY_OPTIONS.map((option) => (
             <FieldLabel key={option.id} htmlFor={`password-policy-${option.id}`}>
@@ -137,62 +164,61 @@ export function PasswordPolicyCard() {
           ))}
         </RadioGroup>
 
-        {isCustom ? (
-          <div className='space-y-4'>
-            <Field data-invalid={Boolean(patternError)}>
-              <FieldLabel htmlFor='password-policy-pattern'>Regular expression</FieldLabel>
-              <Input
-                id='password-policy-pattern'
-                value={draft.customPattern}
-                placeholder='^(?=.*[A-Za-z])(?=.*\d).{8,72}$'
-                className='font-mono text-xs'
-                autoComplete='off'
-                spellCheck={false}
-                aria-invalid={Boolean(patternError)}
-                aria-describedby={patternError ? 'password-policy-pattern-error' : undefined}
-                onChange={(event) =>
-                  setDraft((prev) => ({ ...prev, customPattern: event.target.value }))
-                }
-              />
-              {patternError ? (
-                <FieldError id='password-policy-pattern-error'>{patternError}</FieldError>
-              ) : (
-                <FieldDescription>
-                  It must match the whole password — start with ^ and end with $.
-                </FieldDescription>
-              )}
-            </Field>
-            <Field>
-              <FieldLabel htmlFor='password-policy-hint'>Hint shown to users</FieldLabel>
-              <Input
-                id='password-policy-hint'
-                value={draft.customHint}
-                maxLength={120}
-                placeholder='Use at least 8 characters, including a letter and a number.'
-                onChange={(event) =>
-                  setDraft((prev) => ({ ...prev, customHint: event.target.value }))
-                }
-              />
+        <div className='grid gap-4 sm:grid-cols-2'>
+          <Field data-invalid={minLengthInvalid}>
+            <FieldLabel htmlFor='password-policy-min-length'>Minimum length</FieldLabel>
+            <Input
+              id='password-policy-min-length'
+              type='number'
+              min={PASSWORD_MIN_LENGTH_FLOOR}
+              max={PASSWORD_MAX_LENGTH}
+              value={draft.min_length}
+              aria-invalid={minLengthInvalid}
+              onChange={(event) =>
+                setDraft((prev) => ({ ...prev, min_length: Number(event.target.value) }))
+              }
+            />
+            {minLengthInvalid ? (
+              <FieldError>
+                Between {PASSWORD_MIN_LENGTH_FLOOR} and {PASSWORD_MAX_LENGTH}.
+              </FieldError>
+            ) : (
               <FieldDescription>
-                Shown when a password is rejected. Describe the rule in plain words — users never
-                see the regular expression.
+                Maximum is always {PASSWORD_MAX_LENGTH} (bcrypt limit).
               </FieldDescription>
-            </Field>
-          </div>
-        ) : (
-          <dl className='space-y-3 text-sm'>
-            <div>
-              <dt className='text-muted-foreground text-xs'>Regular expression</dt>
-              <dd className='bg-muted mt-1 rounded-md px-3 py-2 font-mono text-xs break-all'>
-                {pattern}
-              </dd>
-            </div>
-            <div>
-              <dt className='text-muted-foreground text-xs'>Hint shown to users</dt>
-              <dd className='mt-1'>{hint}</dd>
-            </div>
-          </dl>
-        )}
+            )}
+          </Field>
+
+          <fieldset className='space-y-2'>
+            <legend className='text-sm font-medium'>Must include</legend>
+            {FLAGS.map((flag) => (
+              <label key={flag.key} className='flex items-center gap-2 text-sm'>
+                <Checkbox
+                  checked={draft[flag.key]}
+                  onCheckedChange={(checked) =>
+                    setDraft((prev) => ({ ...prev, [flag.key]: checked === true }))
+                  }
+                />
+                {flag.label}
+              </label>
+            ))}
+          </fieldset>
+        </div>
+
+        <Field>
+          <FieldLabel htmlFor='password-policy-hint'>Hint shown to users</FieldLabel>
+          <Input
+            id='password-policy-hint'
+            value={draft.hint}
+            maxLength={PASSWORD_HINT_MAX}
+            placeholder={defaultHintFor(draft)}
+            onChange={(event) => setDraft((prev) => ({ ...prev, hint: event.target.value }))}
+          />
+          <FieldDescription>
+            Shown when a password is rejected. Leave empty to use the generated sentence: &ldquo;
+            {defaultHintFor(draft)}&rdquo;
+          </FieldDescription>
+        </Field>
 
         <div className='space-y-3 rounded-lg border p-3'>
           <Field>
@@ -207,7 +233,7 @@ export function PasswordPolicyCard() {
                 className='font-mono'
                 onChange={(event) => setSample(event.target.value)}
               />
-              {sample && regex && (
+              {sample && (
                 <StatusBadge
                   status={sampleAccepted ? 'accepted' : 'rejected'}
                   tone={sampleAccepted ? 'success' : 'danger'}
@@ -219,30 +245,33 @@ export function PasswordPolicyCard() {
             </FieldDescription>
           </Field>
 
-          {!isCustom && preset && (
-            <ul className='grid gap-1.5 text-sm sm:grid-cols-2'>
-              {preset.requirements.map((requirement) => {
-                const met = sample.length > 0 && requirement.test(sample);
-                return (
-                  <li
-                    key={requirement.label}
-                    className={cn(
-                      'flex items-center gap-2',
-                      met ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'
-                    )}
-                  >
-                    {met ? (
-                      <Icons.circleCheck className='size-4 shrink-0' />
-                    ) : (
-                      <Icons.circle className='size-4 shrink-0' />
-                    )}
-                    {requirement.label}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+          <ul className='grid gap-1.5 text-sm sm:grid-cols-2'>
+            {requirements.map((requirement) => {
+              const met = sample.length > 0 && requirement.test(sample);
+              return (
+                <li
+                  key={requirement.label}
+                  className={cn(
+                    'flex items-center gap-2',
+                    met ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'
+                  )}
+                >
+                  {met ? (
+                    <Icons.circleCheck className='size-4 shrink-0' />
+                  ) : (
+                    <Icons.circle className='size-4 shrink-0' />
+                  )}
+                  {requirement.label}
+                </li>
+              );
+            })}
+          </ul>
 
+          {sample && !sampleAccepted && (
+            <p className='text-muted-foreground text-xs'>
+              Users would see: &ldquo;{effectiveHint}&rdquo;
+            </p>
+          )}
           {tooLong && (
             <p className='text-destructive text-xs'>
               Passwords longer than {PASSWORD_MAX_LENGTH} characters are always rejected.
@@ -254,9 +283,15 @@ export function PasswordPolicyCard() {
         <Button type='button' variant='ghost' disabled={!isDirty} onClick={() => setDraft(saved)}>
           Discard changes
         </Button>
-        <Button type='button' disabled={!canSave} onClick={handleSave}>
+        <LoadingButton
+          type='button'
+          loading={mutation.isPending}
+          loadingLabel='Saving…'
+          disabled={!canSave}
+          onClick={() => void handleSave()}
+        >
           Save policy
-        </Button>
+        </LoadingButton>
       </CardFooter>
     </Card>
   );

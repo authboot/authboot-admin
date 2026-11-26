@@ -1,7 +1,8 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { format } from 'date-fns';
+import { useMutation, useSuspenseQuery } from '@tanstack/react-query';
+import { formatDateTime } from '@/lib/format';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -26,6 +27,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { LoadingButton } from '@/components/ui/loading-button';
 import {
   Sheet,
   SheetContent,
@@ -42,10 +44,17 @@ import { cn } from '@/lib/utils';
 import {
   EMAIL_PREVIEW_RECIPIENT,
   EMAIL_SUBJECT_MAX,
-  EMAIL_TEMPLATES,
+  emailTemplateIcon,
   type EmailTemplateDefinition,
   type EmailTemplateId
 } from '../constants/email-templates';
+import { emailTemplateCatalogQueryOptions, emailTemplatesQueryOptions } from '../api/queries';
+import {
+  resetEmailTemplateMutation,
+  sendTestEmailTemplateMutation,
+  setEmailTemplateMutation
+} from '../api/mutations';
+import type { EmailTemplateDescriptor, EmailTemplateOverride } from '../api/types';
 import {
   buildEmailPreviewDocument,
   defaultEmailTemplateContent,
@@ -59,9 +68,31 @@ import {
 } from '../utils/email-template';
 
 type EmailTemplateSettingsProps = {
+  orgId: number;
   /** Opens the delivery settings, where SMS templates are referenced. */
   onManageDelivery: () => void;
 };
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Request failed';
+}
+
+/** Adapts a backend catalog entry to the shape the editor and utils consume. */
+function toDefinition(d: EmailTemplateDescriptor): EmailTemplateDefinition {
+  return {
+    id: d.template_id,
+    name: d.name,
+    trigger: d.trigger,
+    icon: emailTemplateIcon(d.template_id),
+    variables: d.variables,
+    defaultSubject: d.default_subject,
+    defaultBody: d.default_body
+  };
+}
+
+function toCustom(o: EmailTemplateOverride): CustomTemplate {
+  return { subject: o.subject, body: o.body, updatedAt: new Date(o.updated_at * 1000) };
+}
 
 /** A template the workspace has changed from the built-in default. */
 type CustomTemplate = EmailTemplateContent & { updatedAt: Date };
@@ -103,9 +134,7 @@ function TemplateRow({
           {subject}
         </p>
         {custom && (
-          <p className='text-muted-foreground text-xs'>
-            Edited {format(custom.updatedAt, 'MMM d, yyyy, h:mm a')}
-          </p>
+          <p className='text-muted-foreground text-xs'>Edited {formatDateTime(custom.updatedAt)}</p>
         )}
       </div>
       <Button
@@ -254,33 +283,45 @@ function TemplatePreview({
 }
 
 function TestEmailDialog({
+  orgId,
   template,
+  draft,
   onClose
 }: {
+  orgId: number;
   template: EmailTemplateDefinition;
+  draft: EmailTemplateContent;
   onClose: () => void;
 }) {
   const [recipient, setRecipient] = useState('');
+  const mutation = useMutation(sendTestEmailTemplateMutation);
 
-  function handleSubmit(event: React.FormEvent) {
+  async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     const target = recipient.trim();
-    if (!target) return;
-    // Static version: there is no send endpoint yet, so say so instead of
-    // claiming an email went out.
-    toast.info(`Preview only — no email was sent to ${target}.`);
-    onClose();
+    if (!target || mutation.isPending) return;
+    try {
+      await mutation.mutateAsync({
+        id: orgId,
+        templateId: template.id,
+        values: { subject: draft.subject, body: draft.body, recipient: target }
+      });
+      toast.success(`Test email sent to ${target}`);
+      onClose();
+    } catch (error) {
+      toast.error(errorMessage(error));
+    }
   }
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
+    <Dialog open onOpenChange={(open) => !open && !mutation.isPending && onClose()}>
       <DialogContent>
         <form onSubmit={handleSubmit} className='grid gap-4'>
           <DialogHeader>
             <DialogTitle>Send a test email</DialogTitle>
             <DialogDescription>
-              Sends this draft of the {template.name} email, filled with sample values, so you can
-              check it in a real inbox. The draft is not saved.
+              Sends this draft of the {template.name} email, filled with sample values, through this
+              workspace&apos;s email provider. The draft is not saved.
             </DialogDescription>
           </DialogHeader>
           <div className='grid gap-1.5'>
@@ -292,14 +333,20 @@ function TestEmailDialog({
               placeholder='you@example.com'
               autoComplete='off'
               required
+              disabled={mutation.isPending}
               onChange={(event) => setRecipient(event.target.value)}
             />
           </div>
           <DialogFooter>
             <DialogClose render={<Button type='button' variant='outline' />}>Cancel</DialogClose>
-            <Button type='submit' disabled={!recipient.trim()}>
+            <LoadingButton
+              type='submit'
+              loading={mutation.isPending}
+              loadingLabel='Sending…'
+              disabled={!recipient.trim()}
+            >
               Send test
-            </Button>
+            </LoadingButton>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -308,14 +355,21 @@ function TestEmailDialog({
 }
 
 function TemplateEditorSheet({
+  orgId,
   template,
   initial,
+  saving,
+  serverError,
   onClose,
   onSave
 }: {
+  orgId: number;
   template: EmailTemplateDefinition;
   /** What is saved now: the customized template, or the default. */
   initial: EmailTemplateContent;
+  saving: boolean;
+  /** Rejection from the backend compile step, shown under the form. */
+  serverError: string | null;
   onClose: () => void;
   onSave: (content: EmailTemplateContent) => void;
 }) {
@@ -354,11 +408,12 @@ function TemplateEditorSheet({
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (invalid || !dirty) return;
+    if (invalid || !dirty || saving) return;
     onSave(draft);
   }
 
   function handleCloseRequest() {
+    if (saving) return;
     if (dirty) {
       setConfirmDiscard(true);
     } else {
@@ -426,6 +481,12 @@ function TemplateEditorSheet({
               target={target}
               onInsert={handleInsert}
             />
+
+            {serverError && (
+              <p role='alert' className='text-destructive text-xs'>
+                {serverError}
+              </p>
+            )}
           </form>
 
           <div className='bg-muted/40 border-t p-4 lg:overflow-y-auto lg:border-t-0 lg:border-l'>
@@ -453,13 +514,26 @@ function TemplateEditorSheet({
               <Icons.send />
               Send test
             </Button>
-            <Button type='submit' form={formId} disabled={invalid || !dirty}>
+            <LoadingButton
+              type='submit'
+              form={formId}
+              loading={saving}
+              loadingLabel='Saving…'
+              disabled={invalid || !dirty}
+            >
               Save template
-            </Button>
+            </LoadingButton>
           </div>
         </SheetFooter>
 
-        {testOpen && <TestEmailDialog template={template} onClose={() => setTestOpen(false)} />}
+        {testOpen && (
+          <TestEmailDialog
+            orgId={orgId}
+            template={template}
+            draft={draft}
+            onClose={() => setTestOpen(false)}
+          />
+        )}
 
         <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
           <AlertDialogContent>
@@ -486,28 +560,43 @@ function TemplateEditorSheet({
 /**
  * The emails this workspace sends to its users. Each one starts on the
  * built-in default and can be given its own subject and HTML body, built from
- * the variables the server fills in when it sends that email.
- *
- * Static version — templates live in this component; nothing is sent to the
- * backend yet.
+ * the variables the server fills in when it sends that email. The catalog and
+ * overrides come from the backend; saving compiles the template server-side
+ * and rejects it before anything is written if it cannot render.
  */
-export function EmailTemplateSettings({ onManageDelivery }: EmailTemplateSettingsProps) {
-  const [custom, setCustom] = useState<CustomTemplates>({});
-  const [editing, setEditing] = useState<EmailTemplateDefinition | null>(null);
+export function EmailTemplateSettings({ orgId, onManageDelivery }: EmailTemplateSettingsProps) {
+  const { data: catalogData } = useSuspenseQuery(emailTemplateCatalogQueryOptions());
+  const { data: overrideData } = useSuspenseQuery(emailTemplatesQueryOptions(orgId));
+  const templates = catalogData.templates.map(toDefinition);
+  const custom: CustomTemplates = Object.fromEntries(
+    overrideData.overrides.map((o) => [o.template_id, toCustom(o)])
+  );
 
-  function handleSave(template: EmailTemplateDefinition, content: EmailTemplateContent) {
+  const [editing, setEditing] = useState<EmailTemplateDefinition | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const setMutation = useMutation(setEmailTemplateMutation);
+  const resetMutation = useMutation(resetEmailTemplateMutation);
+  const saving = setMutation.isPending || resetMutation.isPending;
+
+  async function handleSave(template: EmailTemplateDefinition, content: EmailTemplateContent) {
     const restored = isSameEmailTemplateContent(content, defaultEmailTemplateContent(template));
-    // A template saved with the default wording is simply not customized.
-    setCustom((prev) => ({
-      ...prev,
-      [template.id]: restored ? undefined : { ...content, updatedAt: new Date() }
-    }));
-    setEditing(null);
-    toast.success(
-      restored
-        ? `${template.name} email restored to the default`
-        : `${template.name} email template saved`
-    );
+    setServerError(null);
+    try {
+      // A template saved with the default wording is simply not customized.
+      if (restored) {
+        await resetMutation.mutateAsync({ id: orgId, templateId: template.id });
+      } else {
+        await setMutation.mutateAsync({ id: orgId, templateId: template.id, values: content });
+      }
+      setEditing(null);
+      toast.success(
+        restored
+          ? `${template.name} email restored to the default`
+          : `${template.name} email template saved`
+      );
+    } catch (error) {
+      setServerError(errorMessage(error));
+    }
   }
 
   return (
@@ -525,12 +614,15 @@ export function EmailTemplateSettings({ onManageDelivery }: EmailTemplateSetting
         </CardHeader>
         <CardContent>
           <div className='divide-y rounded-lg border'>
-            {EMAIL_TEMPLATES.map((template) => (
+            {templates.map((template) => (
               <TemplateRow
                 key={template.id}
                 template={template}
                 custom={custom[template.id]}
-                onEdit={() => setEditing(template)}
+                onEdit={() => {
+                  setServerError(null);
+                  setEditing(template);
+                }}
               />
             ))}
           </div>
@@ -556,10 +648,13 @@ export function EmailTemplateSettings({ onManageDelivery }: EmailTemplateSetting
       {editing && (
         <TemplateEditorSheet
           key={editing.id}
+          orgId={orgId}
           template={editing}
           initial={custom[editing.id] ?? defaultEmailTemplateContent(editing)}
+          saving={saving}
+          serverError={serverError}
           onClose={() => setEditing(null)}
-          onSave={(content) => handleSave(editing, content)}
+          onSave={(content) => void handleSave(editing, content)}
         />
       )}
     </div>

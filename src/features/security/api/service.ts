@@ -1,334 +1,121 @@
 // ============================================================
-// Security — Data Access Layer (static mock)
+// Security — Data Access Layer (authboot-server via BFF routes)
 // ============================================================
-// The auth service does not expose the security tables yet, so these return
-// fake rows. Replace each function body with an `apiClient` call when the
-// endpoints ship; the query layer and components stay unchanged.
+// admin scope: organization-wide tables — app users' sign-in attempts
+//   (/organizations/:id/user-login-logs) and admins' audit log
+//   (/organizations/:id/audit-logs).
+// user scope: the signed-in admin's own history — /auth/me/login-logs and the
+//   audit log filtered to admin_id.
+// Lists are capped at the newest PAGE_SIZE rows; the tables filter client-side.
 
+import { apiClient } from '@/lib/api-client';
 import type {
-  AccountSecurityOverview,
   AuditLogRecord,
-  DeviceRecord,
+  BackendAdminLoginLog,
+  BackendAuditLog,
+  BackendUserLoginLog,
+  ListAuditLogsResponse,
+  ListMyLoginLogsResponse,
+  ListUserLoginLogsResponse,
   LoginLogRecord,
-  SecurityScope,
-  SessionRecord
+  SecurityContext,
+  SecurityScope
 } from './types';
 
-// Fixed timestamps keep server/client renders identical.
+const PAGE_SIZE = 100;
 
-const ADMIN_LOGIN_LOGS: LoginLogRecord[] = [
-  {
-    id: 'al-1',
-    account: 'chenpeng',
-    ip: '10.99.64.82',
-    location: 'Hangzhou, CN',
-    device: 'MacBook Pro',
-    browser: 'Chrome 131',
-    status: 'success',
-    detail: 'Password + verification code',
-    created_at: '2026-11-12T09:42:00Z'
-  },
-  {
-    id: 'al-2',
-    account: 'li.wei',
-    ip: '10.99.65.12',
-    location: 'Shanghai, CN',
-    device: 'Office Desktop',
-    browser: 'Edge 131',
-    status: 'failed',
-    detail: 'Invalid password (2 attempts)',
-    created_at: '2026-11-12T08:15:00Z'
-  },
-  {
-    id: 'al-3',
-    account: 'wang.fang',
-    ip: '10.99.64.90',
-    location: 'Hangzhou, CN',
-    device: 'iPhone 15',
-    browser: 'Safari 18',
-    status: 'success',
-    detail: 'New device verified by email',
-    created_at: '2026-11-12T07:03:00Z'
-  },
-  {
-    id: 'al-4',
-    account: 'chenpeng',
-    ip: '10.99.64.82',
-    location: 'Hangzhou, CN',
-    device: 'MacBook Pro',
-    browser: 'Chrome 131',
-    status: 'success',
-    detail: 'Token refreshed',
-    created_at: '2026-11-11T18:20:00Z'
-  },
-  {
-    id: 'al-5',
-    account: 'zhao.min',
-    ip: '10.99.70.31',
-    location: 'Beijing, CN',
-    device: 'ThinkPad X1',
-    browser: 'Firefox 133',
-    status: 'failed',
-    detail: 'Account temporarily locked',
-    created_at: '2026-11-11T11:48:00Z'
-  }
-];
-
-const ADMIN_AUDIT_LOGS: AuditLogRecord[] = [
-  {
-    id: 'aa-1',
-    account: 'chenpeng',
-    action: 'Updated workspace settings',
-    resource: 'workspace:acme',
-    result: 'success',
-    ip: '10.99.64.82',
-    created_at: '2026-11-12T09:55:00Z'
-  },
-  {
-    id: 'aa-2',
-    account: 'chenpeng',
-    action: 'Enabled third-party sign-in',
-    resource: 'workspace:acme/login-methods',
-    result: 'success',
-    ip: '10.99.64.82',
-    created_at: '2026-11-12T09:50:00Z'
-  },
-  {
-    id: 'aa-3',
-    account: 'li.wei',
-    action: 'Invited member',
-    resource: 'organization:acme/member:wang.fang',
-    result: 'success',
-    ip: '10.99.65.12',
-    created_at: '2026-11-12T08:30:00Z'
-  },
-  {
-    id: 'aa-4',
-    account: 'li.wei',
-    action: 'Deleted API key',
-    resource: 'organization:acme/apikey:svc-reporting',
-    result: 'failed',
-    ip: '10.99.65.12',
-    created_at: '2026-11-11T16:12:00Z'
-  },
-  {
-    id: 'aa-5',
-    account: 'wang.fang',
-    action: 'Updated display name',
-    resource: 'account:wang.fang',
-    result: 'success',
-    ip: '10.99.64.90',
-    created_at: '2026-11-11T10:05:00Z'
-  }
-];
-
-const ADMIN_SESSIONS: SessionRecord[] = [
-  {
-    id: 'as-1',
-    account: 'chenpeng',
-    device: 'MacBook Pro',
-    ip: '10.99.64.82',
-    location: 'Hangzhou, CN',
-    status: 'active',
-    current: true,
-    last_active_at: '2026-11-12T09:42:00Z'
-  },
-  {
-    id: 'as-2',
-    account: 'li.wei',
-    device: 'Office Desktop',
-    ip: '10.99.65.12',
-    location: 'Shanghai, CN',
-    status: 'active',
-    last_active_at: '2026-11-12T08:15:00Z'
-  },
-  {
-    id: 'as-3',
-    account: 'wang.fang',
-    device: 'iPhone 15',
-    ip: '10.99.64.90',
-    location: 'Hangzhou, CN',
-    status: 'active',
-    last_active_at: '2026-11-12T07:03:00Z'
-  },
-  {
-    id: 'as-4',
-    account: 'zhao.min',
-    device: 'ThinkPad X1',
-    ip: '10.99.70.31',
-    location: 'Beijing, CN',
-    status: 'revoked',
-    last_active_at: '2026-11-10T09:20:00Z'
-  }
-];
-
-const ADMIN_DEVICES: DeviceRecord[] = [
-  {
-    id: 'ad-1',
-    account: 'chenpeng',
-    name: 'MacBook Pro',
-    os: 'macOS 14.6',
-    browser: 'Chrome 131',
-    ip: '10.99.64.82',
-    trusted: true,
-    last_seen_at: '2026-11-12T09:42:00Z'
-  },
-  {
-    id: 'ad-2',
-    account: 'li.wei',
-    name: 'Office Desktop',
-    os: 'Windows 11',
-    browser: 'Edge 131',
-    ip: '10.99.65.12',
-    trusted: true,
-    last_seen_at: '2026-11-12T08:15:00Z'
-  },
-  {
-    id: 'ad-3',
-    account: 'wang.fang',
-    name: 'iPhone 15',
-    os: 'iOS 18.1',
-    browser: 'Safari 18',
-    ip: '10.99.64.90',
-    trusted: false,
-    last_seen_at: '2026-11-12T07:03:00Z'
-  },
-  {
-    id: 'ad-4',
-    account: 'zhao.min',
-    name: 'ThinkPad X1',
-    os: 'Windows 11',
-    browser: 'Firefox 133',
-    ip: '10.99.70.31',
-    trusted: false,
-    last_seen_at: '2026-11-10T09:20:00Z'
-  }
-];
-
-// User scope mirrors the same shapes without the `account` column.
-const USER_LOGIN_LOGS: LoginLogRecord[] = [
-  {
-    id: 'ul-1',
-    ip: '10.99.64.82',
-    location: 'Hangzhou, CN',
-    device: 'MacBook Pro',
-    browser: 'Chrome 131',
-    status: 'success',
-    detail: 'Password + verification code',
-    created_at: '2026-11-12T09:42:00Z'
-  },
-  {
-    id: 'ul-2',
-    ip: '10.99.64.90',
-    location: 'Hangzhou, CN',
-    device: 'iPhone 15',
-    browser: 'Safari 18',
-    status: 'failed',
-    detail: 'Invalid verification code',
-    created_at: '2026-11-11T21:12:00Z'
-  },
-  {
-    id: 'ul-3',
-    ip: '10.99.64.82',
-    location: 'Hangzhou, CN',
-    device: 'MacBook Pro',
-    browser: 'Chrome 131',
-    status: 'success',
-    detail: 'Token refreshed',
-    created_at: '2026-11-11T18:20:00Z'
-  }
-];
-
-const USER_AUDIT_LOGS: AuditLogRecord[] = [
-  {
-    id: 'ua-1',
-    action: 'Updated display name',
-    resource: 'account:self',
-    result: 'success',
-    ip: '10.99.64.82',
-    created_at: '2026-11-12T09:47:00Z'
-  },
-  {
-    id: 'ua-2',
-    action: 'Changed password',
-    resource: 'account:self',
-    result: 'success',
-    ip: '10.99.64.82',
-    created_at: '2026-11-10T15:40:00Z'
-  },
-  {
-    id: 'ua-3',
-    action: 'Connected third-party account',
-    resource: 'oauth:wechat',
-    result: 'failed',
-    ip: '10.99.64.90',
-    created_at: '2026-11-09T11:08:00Z'
-  }
-];
-
-const USER_SESSIONS: SessionRecord[] = [
-  {
-    id: 'us-1',
-    device: 'MacBook Pro',
-    ip: '10.99.64.82',
-    location: 'Hangzhou, CN',
-    status: 'active',
-    current: true,
-    last_active_at: '2026-11-12T09:42:00Z'
-  },
-  {
-    id: 'us-2',
-    device: 'iPhone 15',
-    ip: '10.99.64.90',
-    location: 'Hangzhou, CN',
-    status: 'active',
-    last_active_at: '2026-11-11T21:12:00Z'
-  }
-];
-
-const USER_DEVICES: DeviceRecord[] = [
-  {
-    id: 'ud-1',
-    name: 'MacBook Pro',
-    os: 'macOS 14.6',
-    browser: 'Chrome 131',
-    ip: '10.99.64.82',
-    trusted: true,
-    last_seen_at: '2026-11-12T09:42:00Z'
-  },
-  {
-    id: 'ud-2',
-    name: 'iPhone 15',
-    os: 'iOS 18.1',
-    browser: 'Safari 18',
-    ip: '10.99.64.90',
-    trusted: true,
-    last_seen_at: '2026-11-11T21:12:00Z'
-  }
-];
-
-export async function getLoginLogs(scope: SecurityScope): Promise<LoginLogRecord[]> {
-  return scope === 'admin' ? ADMIN_LOGIN_LOGS : USER_LOGIN_LOGS;
+function unwrap<T extends { code: number; message: string }>(res: T): T {
+  if (res.code !== 0) throw new Error(res.message || 'Request failed');
+  return res;
 }
 
-export async function getAuditLogs(scope: SecurityScope): Promise<AuditLogRecord[]> {
-  return scope === 'admin' ? ADMIN_AUDIT_LOGS : USER_AUDIT_LOGS;
+function toIso(unix: number): string {
+  return unix ? new Date(unix * 1000).toISOString() : '';
 }
 
-export async function getSessions(scope: SecurityScope): Promise<SessionRecord[]> {
-  return scope === 'admin' ? ADMIN_SESSIONS : USER_SESSIONS;
+/** Rough browser label from a user agent ("Chrome 131", "Safari 18", ...). */
+export function browserLabel(ua: string): string {
+  if (!ua) return '';
+  const m =
+    /(Edg|Edge|OPR|Opera|Chrome|Firefox|Safari)\/(\d+)/.exec(ua) ??
+    /(Edg|Edge|OPR|Opera|Chrome|Firefox|Safari)[ /](\d+)/.exec(ua);
+  if (!m) return ua.split(' ')[0].slice(0, 32);
+  const name = m[1] === 'Edg' ? 'Edge' : m[1] === 'OPR' ? 'Opera' : m[1];
+  return `${name} ${m[2]}`;
 }
 
-export async function getDevices(scope: SecurityScope): Promise<DeviceRecord[]> {
-  return scope === 'admin' ? ADMIN_DEVICES : USER_DEVICES;
-}
-
-// Admin-side per-user security preview. The backend has no per-user security
-// endpoint yet, so every user id gets the same static sample bundle.
-export async function getAccountSecurity(): Promise<AccountSecurityOverview> {
+function fromUserLoginLog(r: BackendUserLoginLog): LoginLogRecord {
   return {
-    sessions: USER_SESSIONS,
-    loginLogs: USER_LOGIN_LOGS,
-    auditLogs: USER_AUDIT_LOGS
+    id: String(r.id),
+    account: r.identity_value || `user #${r.user_id}`,
+    ip: r.ip,
+    location: '',
+    device: r.device_name || r.device_id || '',
+    browser: browserLabel(r.user_agent),
+    status: r.success ? 'success' : 'failed',
+    detail: r.success ? r.identity_type : r.err_msg || r.identity_type,
+    created_at: toIso(r.created_at)
   };
+}
+
+function fromAdminLoginLog(r: BackendAdminLoginLog): LoginLogRecord {
+  return {
+    id: String(r.id),
+    ip: r.ip,
+    location: '',
+    device: r.device_name || r.device_id || '',
+    browser: browserLabel(r.user_agent),
+    status: r.success ? 'success' : 'failed',
+    detail: r.success ? '' : r.err_msg,
+    created_at: toIso(r.created_at)
+  };
+}
+
+function fromAuditLog(r: BackendAuditLog, withActor: boolean): AuditLogRecord {
+  const resource = r.resource_type
+    ? r.resource_id
+      ? `${r.resource_type} #${r.resource_id}`
+      : r.resource_type
+    : r.path;
+  return {
+    id: String(r.id),
+    ...(withActor ? { account: `admin #${r.admin_id}` } : {}),
+    action: r.action || `${r.method} ${r.path}`,
+    resource,
+    result: r.success ? 'success' : 'failed',
+    ip: r.ip,
+    created_at: toIso(r.created_at)
+  };
+}
+
+export async function getLoginLogs(
+  scope: SecurityScope,
+  ctx: SecurityContext
+): Promise<LoginLogRecord[]> {
+  if (scope === 'user') {
+    const res = unwrap(
+      await apiClient<ListMyLoginLogsResponse>(`/auth/me/login-logs?page_size=${PAGE_SIZE}`)
+    );
+    return (res.logs ?? []).map(fromAdminLoginLog);
+  }
+  if (!ctx.orgId) return [];
+  const res = unwrap(
+    await apiClient<ListUserLoginLogsResponse>(
+      `/organizations/${ctx.orgId}/user-login-logs?page_size=${PAGE_SIZE}`
+    )
+  );
+  return (res.logs ?? []).map(fromUserLoginLog);
+}
+
+export async function getAuditLogs(
+  scope: SecurityScope,
+  ctx: SecurityContext
+): Promise<AuditLogRecord[]> {
+  if (!ctx.orgId) return [];
+  const qs = new URLSearchParams({ page_size: String(PAGE_SIZE) });
+  if (scope === 'user' && ctx.adminId) qs.set('admin_id', String(ctx.adminId));
+  const res = unwrap(
+    await apiClient<ListAuditLogsResponse>(`/organizations/${ctx.orgId}/audit-logs?${qs}`)
+  );
+  return (res.logs ?? []).map((r) => fromAuditLog(r, scope === 'admin'));
 }

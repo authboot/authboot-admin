@@ -19,6 +19,10 @@ const TONE_CLASS_NAMES: Record<StatusTone, string> = {
 const STATUS_TONES: Record<string, StatusTone> = {
   active: 'success',
   invited: 'warning',
+  pending: 'warning',
+  accepted: 'success',
+  expired: 'neutral',
+  revoked: 'danger',
   inactive: 'danger',
   suspended: 'danger'
 };

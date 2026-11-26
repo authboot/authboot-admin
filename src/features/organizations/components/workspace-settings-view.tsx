@@ -1,6 +1,7 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { parseAsStringLiteral, useQueryState } from 'nuqs';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -11,9 +12,11 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { DangerZoneCard } from './danger-zone-card';
 import { EmailTemplateSettings } from './email-template-settings';
 import { GeneralSettingsCard } from './general-settings-card';
+import { LegalSettings } from './legal-settings';
 import { LoginMethodsSettings } from './login-methods-settings';
 import { MaintenanceSettings } from './maintenance-settings';
 import { MessageProviderSettings, useActiveProviders } from './message-provider-settings';
+import { organizationSettingsQueryOptions } from '../api/queries';
 import { PasswordPolicyCard } from './password-policy-card';
 import { VerificationCodeSettings } from './verification-code-settings';
 
@@ -23,6 +26,7 @@ const SETTINGS_TABS = [
   'verification',
   'delivery',
   'templates',
+  'legal',
   'maintenance'
 ] as const;
 
@@ -62,6 +66,7 @@ type WorkspaceSettingsViewProps = {
  * - Verification  — validity and resend limits of email / phone codes
  * - Delivery      — the email and SMS providers that send those codes
  * - Templates     — the subject and content of the emails users receive
+ * - Legal         — Terms of Service and Privacy Policy versions
  * - Maintenance   — taking the workspace offline with a notice
  *
  * The tab is kept in the URL (?tab=…) so a section can be linked to. Panels
@@ -78,8 +83,10 @@ export function WorkspaceSettingsView({ orgId }: WorkspaceSettingsViewProps) {
   );
 
   // Shared across tabs: the maintenance banner sits above them, and the
-  // verification tab shows which provider sends each channel's codes.
-  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
+  // verification tab shows which provider sends each channel's codes. Both are
+  // plain queries so the other tabs never block on them.
+  const { data: settingsData } = useQuery(organizationSettingsQueryOptions(orgId));
+  const maintenanceEnabled = settingsData?.settings.maintenance.enabled ?? false;
   const activeProviders = useActiveProviders(orgId);
 
   return (
@@ -132,6 +139,10 @@ export function WorkspaceSettingsView({ orgId }: WorkspaceSettingsViewProps) {
               <Icons.mail />
               Templates
             </TabsTrigger>
+            <TabsTrigger value='legal'>
+              <Icons.page />
+              Legal
+            </TabsTrigger>
             <TabsTrigger value='maintenance'>
               <Icons.maintenance />
               Maintenance
@@ -151,7 +162,9 @@ export function WorkspaceSettingsView({ orgId }: WorkspaceSettingsViewProps) {
 
         <TabsContent value='sign-in' keepMounted className='space-y-4'>
           <LoginMethodsSettings />
-          <PasswordPolicyCard />
+          <Suspense fallback={<Skeleton className='h-96 w-full rounded-xl' />}>
+            <PasswordPolicyCard orgId={orgId} />
+          </Suspense>
           <PreviewNotice />
         </TabsContent>
 
@@ -170,17 +183,21 @@ export function WorkspaceSettingsView({ orgId }: WorkspaceSettingsViewProps) {
         </TabsContent>
 
         <TabsContent value='templates' keepMounted className='space-y-4'>
-          <EmailTemplateSettings onManageDelivery={() => void setTab('delivery')} />
-          <PreviewNotice />
+          <Suspense fallback={<Skeleton className='h-64 w-full rounded-xl' />}>
+            <EmailTemplateSettings orgId={orgId} onManageDelivery={() => void setTab('delivery')} />
+          </Suspense>
+        </TabsContent>
+
+        {/* Not kept mounted: two documents' version histories are only fetched
+            when the tab is opened. */}
+        <TabsContent value='legal' className='space-y-4'>
+          <LegalSettings />
         </TabsContent>
 
         <TabsContent value='maintenance' keepMounted className='space-y-4'>
-          <MaintenanceSettings
-            organizationName={organizationName}
-            enabled={maintenanceEnabled}
-            onEnabledChange={setMaintenanceEnabled}
-          />
-          <PreviewNotice />
+          <Suspense fallback={<Skeleton className='h-64 w-full rounded-xl' />}>
+            <MaintenanceSettings orgId={orgId} organizationName={organizationName} />
+          </Suspense>
         </TabsContent>
       </Tabs>
     </div>

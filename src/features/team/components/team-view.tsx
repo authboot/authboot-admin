@@ -1,54 +1,20 @@
 'use client';
 
-import { useState } from 'react';
-import { useSuspenseQuery } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import { AlertModal } from '@/components/modal/alert-modal';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Suspense } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { parseAsInteger, parseAsString, parseAsStringLiteral, useQueryStates } from 'nuqs';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from '@/components/ui/table';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DataTableSkeleton } from '@/components/ui/table/data-table-skeleton';
 import { Icons, type Icon } from '@/components/icons';
-import { StatusBadge } from '@/components/status-badge';
-import { formatDate } from '@/lib/format';
-import { cn } from '@/lib/utils';
-import { teamMembersOptions } from '../api/queries';
-import type { TeamMember, TeamMemberStatus } from '../api/types';
+import { useAuth } from '@/components/auth/auth-provider';
+import { teamInvitationsOptions, teamMembersOptions } from '../api/queries';
+import { MembersTable } from './members-table';
+import { InvitationsTable } from './invitations-table';
 
-function formatShortDate(value: string): string {
-  return formatDate(value, { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-async function copyToClipboard(value: string, label: string) {
-  try {
-    await navigator.clipboard.writeText(value);
-    toast.success(`${label} copied`);
-  } catch {
-    toast.error(`Couldn't copy ${label.toLowerCase()}`);
-  }
-}
-
-function resendInvitation(member: TeamMember) {
-  toast.success(`Invitation resent to ${member.email} (demo)`);
-}
+const TABS = ['members', 'invitations'] as const;
+type Tab = (typeof TABS)[number];
 
 function StatCard({
   icon: StatIcon,
@@ -58,7 +24,7 @@ function StatCard({
 }: {
   icon: Icon;
   label: string;
-  value: number;
+  value: number | string;
   hint: string;
 }) {
   return (
@@ -77,237 +43,106 @@ function StatCard({
   );
 }
 
+/**
+ * Workspace team: joined admins and email invitations, each in its own
+ * server-paginated table. Only the active tab is mounted, since both tables
+ * share the `page` / `perPage` URL parameters.
+ */
 export function TeamView() {
-  const { data } = useSuspenseQuery(teamMembersOptions());
-  const [members, setMembers] = useState<TeamMember[]>(data.members);
-  const [query, setQuery] = useState('');
-  const [status, setStatus] = useState<'all' | TeamMemberStatus>('all');
-  const [removeTarget, setRemoveTarget] = useState<TeamMember | null>(null);
-  const [removing, setRemoving] = useState(false);
+  const { activeOrganizationId } = useAuth();
+  const orgId = activeOrganizationId ?? 0;
 
-  const needle = query.trim().toLowerCase();
-  const visibleMembers = members.filter((member) => {
-    const matchesQuery = !needle || `${member.name} ${member.email}`.toLowerCase().includes(needle);
-    const matchesStatus = status === 'all' || member.status === status;
-    return matchesQuery && matchesStatus;
+  const [params, setParams] = useQueryStates({
+    tab: parseAsStringLiteral(TABS).withDefault('members'),
+    page: parseAsInteger,
+    perPage: parseAsInteger,
+    member: parseAsString,
+    role: parseAsString,
+    mfa: parseAsString,
+    email: parseAsString,
+    status: parseAsString
   });
 
-  const activeCount = members.filter((member) => member.status === 'active').length;
-  const invitedCount = members.filter((member) => member.status === 'invited').length;
-  const twoFactorCount = members.filter((member) => member.two_factor_enabled).length;
+  // Totals for the stat cards: one tiny request per list, independent of the
+  // table filters so the numbers do not change while searching.
+  const membersTotal = useQuery({
+    ...teamMembersOptions(orgId, { page: 1, limit: 1 }),
+    select: (d) => d.total
+  });
+  const pendingTotal = useQuery({
+    ...teamInvitationsOptions(orgId, { page: 1, limit: 1, status: 1 }),
+    select: (d) => d.total
+  });
 
-  const handleRemove = async () => {
-    if (!removeTarget) return;
-    setRemoving(true);
-    // Static demo: wait briefly so the modal's loading state is visible.
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    setMembers((previous) => previous.filter((member) => member.id !== removeTarget.id));
-    setRemoving(false);
-    setRemoveTarget(null);
-    toast.success(`${removeTarget.name} removed (demo)`);
-  };
+  function switchTab(next: Tab) {
+    // Paging and filters belong to the table that set them; reset on switch.
+    void setParams({
+      tab: next,
+      page: null,
+      perPage: null,
+      member: null,
+      email: null,
+      status: null
+    });
+  }
 
+  // The DataTable body is an absolutely positioned box that fills its flex
+  // parent, so every ancestor down to it must be a `flex-1` column.
   return (
-    <div className='flex flex-col gap-4'>
-      <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-4'>
+    <div className='flex flex-1 flex-col gap-6'>
+      <div className='grid gap-3 sm:grid-cols-2'>
         <StatCard
           icon={Icons.teams}
           label='Workspace admins'
-          value={members.length}
-          hint='All members have admin access'
-        />
-        <StatCard
-          icon={Icons.check}
-          label='Active'
-          value={activeCount}
-          hint='Signed in at least once'
+          value={membersTotal.data ?? '—'}
+          hint='Accounts that have joined'
         />
         <StatCard
           icon={Icons.mail}
-          label='Pending invites'
-          value={invitedCount}
+          label='Pending invitations'
+          value={pendingTotal.data ?? '—'}
           hint='Awaiting acceptance'
-        />
-        <StatCard
-          icon={Icons.shieldCheck}
-          label='2FA enabled'
-          value={twoFactorCount}
-          hint={`${members.length - twoFactorCount} without 2FA`}
         />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className='flex items-center gap-2'>
-            <Icons.teams className='size-5' />
-            Team members
-            <Badge variant='secondary'>{members.length}</Badge>
-          </CardTitle>
-          <CardDescription>
-            Every member of this workspace is an Admin. This roster is a static preview — changes
-            are not persisted.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className='space-y-4'>
-          <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-            <div className='relative w-full sm:max-w-xs'>
-              <Icons.search className='text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2' />
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder='Search by name or email…'
-                className='pl-8'
-                aria-label='Search team members'
-              />
-            </div>
-            <NativeSelect
-              value={status}
-              onChange={(event) => setStatus(event.target.value as 'all' | TeamMemberStatus)}
-              aria-label='Filter by status'
-              size='sm'
-            >
-              <NativeSelectOption value='all'>All statuses</NativeSelectOption>
-              <NativeSelectOption value='active'>Active</NativeSelectOption>
-              <NativeSelectOption value='invited'>Invited</NativeSelectOption>
-              <NativeSelectOption value='suspended'>Suspended</NativeSelectOption>
-            </NativeSelect>
-          </div>
+      <Tabs
+        value={params.tab}
+        onValueChange={(v) => switchTab(v as Tab)}
+        className='flex flex-1 flex-col gap-4'
+      >
+        <TabsList variant='line'>
+          <TabsTrigger value='members'>
+            <Icons.teams />
+            Members
+            {membersTotal.data !== undefined && (
+              <Badge variant='secondary' className='ml-1'>
+                {membersTotal.data}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value='invitations'>
+            <Icons.mail />
+            Invitations
+            {pendingTotal.data !== undefined && pendingTotal.data > 0 && (
+              <Badge variant='secondary' className='ml-1'>
+                {pendingTotal.data}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
 
-          <div className='overflow-x-auto rounded-lg border'>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Member</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>2FA</TableHead>
-                  <TableHead>Joined</TableHead>
-                  <TableHead>Last active</TableHead>
-                  <TableHead className='text-right'>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visibleMembers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7}>
-                      <div className='text-muted-foreground flex flex-col items-center justify-center gap-2 py-10 text-sm'>
-                        <Icons.search className='size-6' />
-                        {members.length === 0
-                          ? 'No admins left in this workspace.'
-                          : 'No members match your filters.'}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  visibleMembers.map((member) => (
-                    <TableRow key={member.id}>
-                      <TableCell>
-                        <div className='flex items-center gap-2'>
-                          <Avatar className='size-8 rounded-full'>
-                            <AvatarImage src={member.avatar || ''} alt={member.name} />
-                            <AvatarFallback className='text-xs'>
-                              {member.name.slice(0, 2).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className='flex min-w-0 flex-col'>
-                            <span className='flex items-center gap-1.5 truncate font-medium'>
-                              {member.name}
-                              {member.is_current_user && (
-                                <Badge variant='secondary' className='h-4 px-1 text-[10px]'>
-                                  You
-                                </Badge>
-                              )}
-                            </span>
-                            <a
-                              href={`mailto:${member.email}`}
-                              className='text-muted-foreground truncate text-xs hover:underline'
-                            >
-                              {member.email}
-                            </a>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant='outline'>{member.role}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={member.status} />
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={cn(
-                            'text-xs',
-                            member.two_factor_enabled ? 'text-foreground' : 'text-muted-foreground'
-                          )}
-                        >
-                          {member.two_factor_enabled ? 'Enabled' : 'Off'}
-                        </span>
-                      </TableCell>
-                      <TableCell className='text-muted-foreground text-xs whitespace-nowrap'>
-                        {formatShortDate(member.joined_at)}
-                      </TableCell>
-                      <TableCell className='text-muted-foreground text-xs whitespace-nowrap'>
-                        {formatShortDate(member.last_active_at)}
-                      </TableCell>
-                      <TableCell className='text-right'>
-                        <DropdownMenu modal={false}>
-                          <DropdownMenuTrigger
-                            render={
-                              <Button
-                                variant='ghost'
-                                size='icon-sm'
-                                aria-label={`Actions for ${member.name}`}
-                              />
-                            }
-                          >
-                            <Icons.ellipsis className='size-4' />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align='end'>
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem
-                              onClick={() => void copyToClipboard(member.email, 'Email')}
-                            >
-                              <Icons.mail className='mr-2 size-4' /> Copy email
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              disabled={member.status !== 'invited'}
-                              onClick={() => resendInvitation(member)}
-                            >
-                              <Icons.send className='mr-2 size-4' /> Resend invitation
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              variant='destructive'
-                              disabled={member.is_current_user}
-                              onClick={() => setRemoveTarget(member)}
-                            >
-                              <Icons.trash className='mr-2 size-4' /> Remove admin
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+        <TabsContent value='members' className='flex flex-1 flex-col'>
+          <Suspense fallback={<DataTableSkeleton columnCount={7} rowCount={8} />}>
+            <MembersTable />
+          </Suspense>
+        </TabsContent>
 
-      <AlertModal
-        isOpen={Boolean(removeTarget)}
-        onClose={() => setRemoveTarget(null)}
-        onConfirm={() => void handleRemove()}
-        loading={removing}
-        title='Remove admin?'
-        description={
-          removeTarget
-            ? `${removeTarget.name} will lose access to this workspace. This is a demo action and is not persisted.`
-            : 'This action cannot be undone.'
-        }
-        confirmLabel='Remove admin'
-      />
+        <TabsContent value='invitations' className='flex flex-1 flex-col'>
+          <Suspense fallback={<DataTableSkeleton columnCount={5} rowCount={5} />}>
+            <InvitationsTable />
+          </Suspense>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

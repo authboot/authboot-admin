@@ -5,12 +5,13 @@ import {
   updateUser,
   uploadUserAvatar,
   deleteUser,
+  createUserAddress,
   updateUserAddress,
-  createUserNote,
-  deleteUserNote
+  deleteUserAddress,
+  setDefaultUserAddress
 } from './service';
 import { userKeys } from './queries';
-import type { UserAddress, UserMutationPayload, UserNotePayload } from './types';
+import type { UserAddressPayload, UserMutationPayload } from './types';
 
 export const createUserMutation = mutationOptions({
   mutationFn: (data: UserMutationPayload) => createUser(data),
@@ -41,28 +42,43 @@ export const deleteUserMutation = mutationOptions({
   }
 });
 
-export const updateUserAddressMutation = mutationOptions({
-  mutationFn: ({ id, address }: { id: number; address: UserAddress }) =>
-    updateUserAddress(id, address),
+// ---- Addresses ----
+
+export const createUserAddressMutation = mutationOptions({
+  mutationFn: ({ id, values }: { id: number; values: UserAddressPayload }) =>
+    createUserAddress(id, values),
   onSuccess: (_data, { id }) => {
     getQueryClient().invalidateQueries({ queryKey: userKeys.addresses(id) });
   }
 });
 
-// Notes update the cached list from the mutation response instead of
-// invalidating: the dev-only store lives in the browser bundle, so a refetch
-// would hit a fresh server-side copy and drop the just-added note.
-export const createUserNoteMutation = mutationOptions({
-  mutationFn: ({ id, values }: { id: number; values: UserNotePayload }) =>
-    createUserNote(id, values),
-  onSuccess: (data, { id }) => {
-    getQueryClient().setQueryData(userKeys.notes(id), data);
+export const updateUserAddressMutation = mutationOptions({
+  mutationFn: ({
+    id,
+    addressId,
+    values
+  }: {
+    id: number;
+    addressId: number;
+    values: UserAddressPayload;
+  }) => updateUserAddress(id, addressId, values),
+  onSuccess: (_data, { id }) => {
+    getQueryClient().invalidateQueries({ queryKey: userKeys.addresses(id) });
   }
 });
 
-export const deleteUserNoteMutation = mutationOptions({
-  mutationFn: ({ id, noteId }: { id: number; noteId: number }) => deleteUserNote(id, noteId),
-  onSuccess: (data, { id }) => {
-    getQueryClient().setQueryData(userKeys.notes(id), data);
+export const deleteUserAddressMutation = mutationOptions({
+  mutationFn: ({ id, addressId }: { id: number; addressId: number }) =>
+    deleteUserAddress(id, addressId),
+  onSuccess: (_data, { id }) => {
+    getQueryClient().invalidateQueries({ queryKey: userKeys.addresses(id) });
+  }
+});
+
+export const setDefaultUserAddressMutation = mutationOptions({
+  mutationFn: ({ id, addressId }: { id: number; addressId: number }) =>
+    setDefaultUserAddress(id, addressId),
+  onSuccess: (_data, { id }) => {
+    getQueryClient().invalidateQueries({ queryKey: userKeys.addresses(id) });
   }
 });

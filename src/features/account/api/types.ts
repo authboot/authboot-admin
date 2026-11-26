@@ -1,26 +1,59 @@
 // ============================================================
-// Account sessions — Type Contract
+// Account — Type Contract
 // ============================================================
-// Mirrors the session shape the auth service is expected to expose. The UI
-// only depends on this contract, so wiring the backend later is a change to
-// `service.ts` alone.
+// Admin sessions come from /api/v1/admin/accounts/:id/sessions (redis-backed:
+// only live sessions are listed, revoked ones disappear).
 
+/** One admin session (idl/session.proto AdminSession). Timestamps are ISO, '' if unset. */
 export type SessionDevice = {
   id: string;
-  /** Human readable device label, e.g. "MacBook Pro". */
   device_name: string;
-  browser: string;
-  os: string;
-  ip: string;
-  location: string;
-  /** ISO timestamp of the last request from this device. */
-  last_active_at: string;
-  /** ISO timestamp of when the session was created. */
+  device_id: string;
+  current_organization_id: number;
+  status: 'active' | 'revoked' | 'expired';
   created_at: string;
-  /** Marks the session that issued the current request. */
+  expires_at: string;
+  last_active_at: string;
+  /** The session issuing the current request. */
   current: boolean;
 };
 
 export type SessionsResponse = {
   sessions: SessionDevice[];
+  total: number;
+};
+
+// Backend DTOs
+export type BackendAdminSession = {
+  session_id?: string;
+  account_id?: number;
+  current_organization_id?: number;
+  device_id?: string;
+  device_name?: string;
+  status?: number;
+  created_at?: number;
+  expires_at?: number;
+  last_active_at?: number;
+  current?: boolean;
+};
+
+export type ListAdminSessionsResponse = {
+  code: number;
+  message: string;
+  sessions?: BackendAdminSession[];
+  total?: number;
+};
+
+export type SimpleResponse = {
+  code: number;
+  message: string;
+};
+
+// ---- Admin preferences ----
+// The backend stores a flat string map per admin (admin.proto MySettings).
+// Keys and parsing live in `@/lib/preferences`.
+export type MySettingsResponse = {
+  code: number;
+  message: string;
+  settings: Record<string, string>;
 };

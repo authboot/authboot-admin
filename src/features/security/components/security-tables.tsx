@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
+import { useAuth } from '@/components/auth/auth-provider';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,19 +17,8 @@ import {
 } from '@/components/ui/table';
 import { Icons, type Icon } from '@/components/icons';
 import { formatDate } from '@/lib/format';
-import {
-  auditLogsQueryOptions,
-  devicesQueryOptions,
-  loginLogsQueryOptions,
-  sessionsQueryOptions
-} from '../api/queries';
-import type {
-  AuditLogRecord,
-  DeviceRecord,
-  LoginLogRecord,
-  SecurityScope,
-  SessionRecord
-} from '../api/types';
+import { auditLogsQueryOptions, loginLogsQueryOptions } from '../api/queries';
+import type { AuditLogRecord, LoginLogRecord, SecurityContext, SecurityScope } from '../api/types';
 
 type Column<T> = {
   key: string;
@@ -276,169 +266,11 @@ const AUDIT_COLUMNS: Record<SecurityScope, Column<AuditLogRecord>[]> = {
   ]
 };
 
-const SESSION_COLUMNS: Record<SecurityScope, Column<SessionRecord>[]> = {
-  admin: [
-    {
-      key: 'account',
-      header: 'Account',
-      cell: (row) => <span className='font-medium'>{row.account}</span>
-    },
-    {
-      key: 'device',
-      header: 'Device',
-      cell: (row) => (
-        <div className='flex flex-wrap items-center gap-2'>
-          <span className='font-medium'>{row.device}</span>
-          {row.current && <Badge variant='outline'>This device</Badge>}
-        </div>
-      )
-    },
-    {
-      key: 'ip',
-      header: 'IP / location',
-      cell: (row) => (
-        <div>
-          <p className='font-mono text-xs'>{row.ip}</p>
-          <p className='text-muted-foreground text-xs'>{row.location}</p>
-        </div>
-      )
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      cell: (row) => (
-        <ResultBadge ok={row.status === 'active'} okLabel='Active' failLabel='Revoked' />
-      )
-    },
-    {
-      key: 'last_active_at',
-      header: 'Last active',
-      cell: (row) =>
-        row.current ? (
-          <span className='text-muted-foreground text-xs whitespace-nowrap'>Active now</span>
-        ) : (
-          <TimeCell value={row.last_active_at} />
-        )
-    }
-  ],
-  user: [
-    {
-      key: 'device',
-      header: 'Device',
-      cell: (row) => (
-        <div className='flex flex-wrap items-center gap-2'>
-          <span className='font-medium'>{row.device}</span>
-          {row.current && <Badge variant='outline'>This device</Badge>}
-        </div>
-      )
-    },
-    {
-      key: 'ip',
-      header: 'IP / location',
-      cell: (row) => (
-        <div>
-          <p className='font-mono text-xs'>{row.ip}</p>
-          <p className='text-muted-foreground text-xs'>{row.location}</p>
-        </div>
-      )
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      cell: (row) => (
-        <ResultBadge ok={row.status === 'active'} okLabel='Active' failLabel='Revoked' />
-      )
-    },
-    {
-      key: 'last_active_at',
-      header: 'Last active',
-      cell: (row) =>
-        row.current ? (
-          <span className='text-muted-foreground text-xs whitespace-nowrap'>Active now</span>
-        ) : (
-          <TimeCell value={row.last_active_at} />
-        )
-    }
-  ]
-};
-
-const DEVICE_COLUMNS: Record<SecurityScope, Column<DeviceRecord>[]> = {
-  admin: [
-    {
-      key: 'account',
-      header: 'Owner',
-      cell: (row) => <span className='font-medium'>{row.account}</span>
-    },
-    {
-      key: 'device',
-      header: 'Device',
-      cell: (row) => (
-        <div>
-          <p className='font-medium'>{row.name}</p>
-          <p className='text-muted-foreground text-xs'>
-            {row.os} · {row.browser}
-          </p>
-        </div>
-      )
-    },
-    { key: 'ip', header: 'IP', cell: (row) => <span className='font-mono text-xs'>{row.ip}</span> },
-    {
-      key: 'trusted',
-      header: 'Trust',
-      cell: (row) => (
-        <Badge variant={row.trusted ? 'secondary' : 'outline'}>
-          {row.trusted ? 'Trusted' : 'Unverified'}
-        </Badge>
-      )
-    },
-    {
-      key: 'last_seen_at',
-      header: 'Last seen',
-      cell: (row) => <TimeCell value={row.last_seen_at} />
-    }
-  ],
-  user: [
-    {
-      key: 'device',
-      header: 'Device',
-      cell: (row) => (
-        <div>
-          <p className='font-medium'>{row.name}</p>
-          <p className='text-muted-foreground text-xs'>
-            {row.os} · {row.browser}
-          </p>
-        </div>
-      )
-    },
-    { key: 'ip', header: 'IP', cell: (row) => <span className='font-mono text-xs'>{row.ip}</span> },
-    {
-      key: 'trusted',
-      header: 'Trust',
-      cell: (row) => (
-        <Badge variant={row.trusted ? 'secondary' : 'outline'}>
-          {row.trusted ? 'Trusted' : 'Unverified'}
-        </Badge>
-      )
-    },
-    {
-      key: 'last_seen_at',
-      header: 'Last seen',
-      cell: (row) => <TimeCell value={row.last_seen_at} />
-    }
-  ]
-};
-
 const loginLogSearchText = (row: LoginLogRecord) =>
   [row.account ?? '', row.ip, row.location, row.device, row.browser, row.detail].join(' ');
 
 const auditLogSearchText = (row: AuditLogRecord) =>
   [row.account ?? '', row.action, row.resource, row.result, row.ip].join(' ');
-
-const sessionSearchText = (row: SessionRecord) =>
-  [row.account ?? '', row.device, row.ip, row.location, row.status].join(' ');
-
-const deviceSearchText = (row: DeviceRecord) =>
-  [row.account ?? '', row.name, row.os, row.browser, row.ip].join(' ');
 
 // ---------------------------------------------------------------------------
 // Table components
@@ -454,11 +286,11 @@ export function LoginLogTableContent({
   return (
     <SecurityTable
       icon={Icons.login}
-      title={scope === 'admin' ? 'Admin login logs' : 'Login history'}
+      title={scope === 'admin' ? 'User sign-in attempts' : 'Login history'}
       description={
         scope === 'admin'
-          ? 'Sign-in attempts across every admin account (tb_admin_login_logs).'
-          : 'Recent sign-in attempts on your account (tb_user_login_logs).'
+          ? 'Sign-in attempts by app users of the active workspace, newest 100.'
+          : 'Recent sign-in attempts on your admin account, newest 100.'
       }
       rows={rows}
       columns={LOGIN_LOG_COLUMNS[scope]}
@@ -468,8 +300,15 @@ export function LoginLogTableContent({
   );
 }
 
+/** Organization + admin ids the security endpoints are scoped by. */
+export function useSecurityContext(): SecurityContext {
+  const { user, activeOrganizationId } = useAuth();
+  return { orgId: activeOrganizationId ?? 0, adminId: user?.id ?? 0 };
+}
+
 export function LoginLogTable({ scope }: { scope: SecurityScope }) {
-  const { data } = useSuspenseQuery(loginLogsQueryOptions(scope));
+  const ctx = useSecurityContext();
+  const { data } = useSuspenseQuery(loginLogsQueryOptions(scope, ctx));
 
   return <LoginLogTableContent scope={scope} rows={data} />;
 }
@@ -487,8 +326,8 @@ export function AuditLogTableContent({
       title={scope === 'admin' ? 'Admin audit logs' : 'Security log'}
       description={
         scope === 'admin'
-          ? 'Privileged actions performed by admins (tb_admin_audit_logs).'
-          : 'Security-relevant changes on your account (tb_user_audit_logs).'
+          ? 'Privileged actions by admins in the active workspace, newest 100.'
+          : 'Privileged actions you performed in the active workspace, newest 100.'
       }
       rows={rows}
       columns={AUDIT_COLUMNS[scope]}
@@ -499,69 +338,10 @@ export function AuditLogTableContent({
 }
 
 export function AuditLogTable({ scope }: { scope: SecurityScope }) {
-  const { data } = useSuspenseQuery(auditLogsQueryOptions(scope));
+  const ctx = useSecurityContext();
+  const { data } = useSuspenseQuery(auditLogsQueryOptions(scope, ctx));
 
   return <AuditLogTableContent scope={scope} rows={data} />;
-}
-
-export function SessionTableContent({
-  scope,
-  rows
-}: {
-  scope: SecurityScope;
-  rows: SessionRecord[];
-}) {
-  return (
-    <SecurityTable
-      icon={Icons.laptop}
-      title='Sessions'
-      description={
-        scope === 'admin'
-          ? 'Active and revoked admin sessions (tb_admin_sessions).'
-          : 'Your active sessions (tb_user_sessions).'
-      }
-      rows={rows}
-      columns={SESSION_COLUMNS[scope]}
-      searchPlaceholder='Search by account, device or IP…'
-      searchText={sessionSearchText}
-    />
-  );
-}
-
-export function SessionTable({ scope }: { scope: SecurityScope }) {
-  const { data } = useSuspenseQuery(sessionsQueryOptions(scope));
-
-  return <SessionTableContent scope={scope} rows={data} />;
-}
-
-export function DeviceTableContent({
-  scope,
-  rows
-}: {
-  scope: SecurityScope;
-  rows: DeviceRecord[];
-}) {
-  return (
-    <SecurityTable
-      icon={Icons.phone}
-      title='Devices'
-      description={
-        scope === 'admin'
-          ? 'Devices seen across admin accounts (tb_admin_devices).'
-          : 'Devices linked to your account (tb_user_devices).'
-      }
-      rows={rows}
-      columns={DEVICE_COLUMNS[scope]}
-      searchPlaceholder='Search by owner, device or IP…'
-      searchText={deviceSearchText}
-    />
-  );
-}
-
-export function DeviceTable({ scope }: { scope: SecurityScope }) {
-  const { data } = useSuspenseQuery(devicesQueryOptions(scope));
-
-  return <DeviceTableContent scope={scope} rows={data} />;
 }
 
 export function SecurityTableSkeleton() {
